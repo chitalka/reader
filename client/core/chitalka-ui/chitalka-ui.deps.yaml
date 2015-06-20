@@ -1,0 +1,21 @@
+- block: y-page
+  required: true
+- block: y-block
+  required: true
+- block: jquery
+  required: true
+- block: inherit
+  required: true
+- block: chitalka-fb2
+  required: true
+- controls
+- spin
+
+- block: 'file-drag'
+  required: true
+
+- block: spin
+  view: 'default-large'
+
+- block: y-block
+  elem: auto-init

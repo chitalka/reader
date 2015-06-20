@@ -1,0 +1,5 @@
+node_modules
+.enb/tmp
+build/index/*
+!build/index/i
+!build/index/index.btjson.js

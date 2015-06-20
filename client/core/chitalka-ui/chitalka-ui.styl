@@ -1,0 +1,177 @@
+.chitalka-ui {
+    $text-size = 12px;
+    $margin = 15px;
+
+    font: 15px/1.4 Arial, sans-serif;
+
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+
+    overflow: hidden;
+
+    min-width: 790px;
+
+    &._drag {
+        background: #fff;
+
+        &::after {
+            position: absolute;
+            content: '';
+            left: 30px;
+            bottom: 30px;
+            right: 30px;
+            top: 30px;
+            text-align: center;
+            border: 4px dashed #0f0;
+        }
+        &::before {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            transform: translateY(-50%);
+            text-align: center;
+            content: 'drag file here';
+        }
+    }
+
+
+    &._mode_one-page {
+        min-width: 790px;
+    }
+    &._mode_two-page {
+        min-width: 1490px;
+    }
+
+    &__book {
+        padding: 0 30px;
+        visibility: visible;
+
+        opacity: 1;
+
+        transition: visibility 0s ease, opacity 1s ease;
+    }
+
+    &__controls {
+        position: absolute;
+        top: $margin;
+        right: 0;
+        bottom: 0;
+        left: 0;
+    }
+
+    &__progress-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+
+        height: 4px;
+
+        background: #fc0;
+
+        transition: width .5s ease;
+    }
+
+    &__progress {
+        font-size: $text-size;
+
+        position: absolute;
+        bottom: $margin;
+        left: 50%;
+
+        margin-left: -150px;
+        width: 300px;
+
+        text-align: center;
+
+        color: #999;
+    }
+
+    &__estimated {
+        font-size: $text-size;
+
+        position: absolute;
+        bottom: $margin;
+        right: $margin;
+        text-align: right;
+
+        width: 200px;
+
+        color: #999;
+    }
+
+    &._loading &__loader {
+        display: block;
+    }
+
+    &__loader,
+    &._loading &__progress,
+    &._loading &__estimated,
+    &._drag &__progress,
+    &._drag &__loader,
+    &._drag &__estimated {
+        display: none;
+    }
+
+    &._loading &__book,
+    &._drag &__book {
+        visibility: hidden;
+
+        opacity: 0;
+    }
+
+    &._no-book {
+        &::before {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            transform: translateY(-50%);
+            text-align: center;
+            content: 'no book, drag book here';
+        }
+    }
+
+
+    &__loader {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+
+        text-align: center;
+
+        /* Псевдо-элмемент нужен для вертикального выравнивания inline-block'а */
+        &:after {
+            display: inline-block;
+            height: 100%;
+            content: '';
+            vertical-align: middle
+        }
+    }
+    &__back-to-page {
+        font-size: $text-size;
+
+        position: absolute;
+        bottom: $margin;
+        left: $margin;
+
+        width: 200px;
+
+        display: none;
+
+        color: #999;
+        cursor: pointer;
+        text-decoration: underline;
+
+        &:hover {
+            color: #333;
+        }
+
+        &._visible {
+            display: block;
+        }
+    }
+}

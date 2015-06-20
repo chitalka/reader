@@ -1,0 +1,7 @@
+- chitalka
+- unzip
+- storage
+- block: chitalka-design
+  required: true
+- gsap
+- chitalka-ui

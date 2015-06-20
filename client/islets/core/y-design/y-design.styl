@@ -1,0 +1,129 @@
+$y-design = {
+    common: {
+        font-family: Arial\, Helvetica\, sans-serif,
+        transition-duration: .15s,
+        transition-timing-function: ease-out,
+        transition: .15s ease-out
+    },
+
+    link: {
+        color: #44b,
+        text-decoration: none,
+
+         // Второстепенная ссылка с фиолетовым оттенком. Используется, например, в футере.
+        _minor: {
+            color: #669
+        },
+
+        // Ссылка на внешние ресурсы, зеленого цвета.
+        _outer: {
+            color: #070
+        }
+
+        _hover: {
+            color: #e00
+        }
+    },
+
+    island: {
+        background-color: #fff,
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, .1),
+
+        _flying: {
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, .1)\, 0 10px 20px -5px rgba(0, 0, 0, .4)
+        }
+    },
+
+    box: {
+        cursor: pointer,
+
+        border-radius: 3px,
+        border-width: 1px,
+        border-style: solid,
+
+        border-color: rgba(0, 0, 0, 0.2),
+        border-color-ie8: #CCC,
+
+        background-color: #FFF
+
+        _hover: {
+            border-color: rgba(0, 0, 0, 0.3)
+            border-color-ie8: #B3B3B3,
+        },
+        _focus: {
+            box-shadow: 0 0 10px #FC0
+            border-color: rgba(178, 142, 0, 0.6),
+            border-color-ie8: #D1BB66,
+        },
+        _pressed: {
+            background-color: #F6F5F3
+        },
+        _checked: {
+            background-color: #FFEBA0
+            border-color: rgba(153, 122, 0, 0.5),
+            border-color-ie8: #CCB350,
+        },
+        _checked_hover: {
+            border-color: rgba(129, 103, 0, 0.6),
+            border-color-ie8: #B39C40
+        },
+        _disabled: {
+            border-color: transparent, // $y-design.box._disabled['border-color'] не нужен, но удалить не получается чтоб не ломалось
+            background-color: rgba(0, 0, 0, 0.08),
+            background-color-ie8: #EBEBEB,
+            box-shadow: none,
+            cursor: default
+        }
+    },
+
+    airbox: {
+        border-color: rgba(0, 0, 0, 0.08),
+        border-color-ie8: #ccc,
+        box-shadow: 0 3px 0 0 rgba(0, 0, 0, 0.06),
+        background-color: rgba(255, 255, 255, 0.95),
+        background-color-ie8: white,
+
+        _focus: {
+            box-shadow: 0 3px 0 0 rgba(0, 0, 0, 0.06),
+            border-color: #f5ba4c
+        },
+
+        _hover: {
+            border-color: rgba(0, 0, 0, 0.2),
+            border-color-ie8: #b3b3b3
+        },
+
+        _pressed: {
+            border-color: rgba(0, 0, 0, 0.2),
+            border-color-ie8: #b3b3b3,
+            opacity: 0.8
+        },
+
+        _disabled: {
+            background-color: rgba(242, 242, 242, 0.95),
+            background-color-ie8: #dfdfdf
+        }
+    },
+
+    pseudobox: {
+        background-color: transparent
+
+        _pressed: {
+            background-color: rgba(0, 0, 0, 0.05)
+        }
+    },
+
+    popup: {
+        background-color: #FFF
+
+        ok: {
+            background-color: rgba(108, 186, 104, .9)
+        },
+        help: {
+            background-color: rgba(50, 50, 50, .8)
+        },
+        error: {
+            background-color: rgba(255, 100, 100,.9)
+        }
+    }
+}

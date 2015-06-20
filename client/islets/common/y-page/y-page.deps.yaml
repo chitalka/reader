@@ -1,0 +1,4 @@
+- y-global
+- block: y-design
+  required: true
+- block: y-ua

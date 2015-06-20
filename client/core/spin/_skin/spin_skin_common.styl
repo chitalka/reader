@@ -1,0 +1,50 @@
+spin_skin_common() {
+
+  & {
+      display: inline-block;
+
+      box-sizing: border-box;
+
+      border: 2px solid transparent;
+      border-radius: 100px;
+      /*
+       * Поддержка CSS анимаций и CSS градиентов у основных браузеров совпадает
+       * Если браузер не поддерживает градиенты, будет показана gif-анимация
+       */
+      background-image: url(images/spin.gif);
+      background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
+  }
+
+  /* Для правильного позиционирования прелоадера относительно baseline */
+  &:after {
+      visibility: hidden;
+
+      content: '\00A0'; /* &nbsp; */
+  }
+
+  &._progressed {
+      display: inline-block;
+
+      animation: spin 1s infinite linear;
+      backface-visibility: hidden;  /* Для ускорения анимации */
+  }
+
+  @keyframes spin
+  {
+      from
+      {
+          border-top-color: #fc0;
+          border-left-color: #fc0;
+
+          transform: rotate(0deg);
+      }
+      to
+      {
+          border-top-color: #fc0;
+          border-left-color: #fc0;
+
+          -webkit-transform: rotate(360deg);
+                  transform: rotate(360deg);
+      }
+  }
+}

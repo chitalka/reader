@@ -1,0 +1,32 @@
+{
+  "name": "chitalka",
+  "description": "",
+  "version": "1.0.0",
+  "author": "Yandex Maps <mapsui-dev-team.ru>",
+  "private": true,
+  "devDependencies": {
+    "inherit": "2.2.2",
+    "vow-fs": "0.3.2",
+    "vow": "0.4.4",
+    "enb-bevis-helper": "1.1.0",
+    "stylus": "0.47.1"
+  },
+  "enb": {
+    "dependencies": [
+      "vow",
+      "inherit"
+    ],
+    "sources": [
+      "client/islets/common",
+      "client/islets/core",
+      "client/core"
+    ],
+    "profiles": {
+      "index": {
+        "sources": [
+          "build/index"
+        ]
+      }
+    }
+  }
+}

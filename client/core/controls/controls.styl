@@ -1,0 +1,319 @@
+.controls_default {
+    $item-height = 42px;
+    $margin = 15px;
+    $arrowWidth = 70px;
+    $arrowImageWidth = 15px;
+    $arrowImageHeight = 24px;
+
+    item() {
+        position: relative;
+
+        width: 42px;
+        height: $item-height;
+
+        cursor: pointer;
+        background-repeat: no-repeat;
+        background-position: center, 50% 100%;
+
+        &._disabled {
+            cursor: default;
+        }
+    }
+
+    &._hidden &__menu {
+        /*
+        Добавляем стартовое положение для анимации появления элемента menu.
+        131px - длина окружности кнопки "menu",
+        что бы выкатывание(появление) кнопки было реалистичней
+        */
+        transform: translateX(-131px) rotate(-360deg);
+    }
+
+    &__menu {
+        width: 42px;
+        margin-left: $margin;
+
+        user-select: none;
+        transition-timing-function: cubic-bezier(.75, 0, .25, 1);
+        transition-duration: .25s, .25s, .25s, .5s;
+        transition-property: background-color, box-shadow, opacity, transform;
+        transform: translateX(0) rotate(0);
+
+        border-radius: 21px;
+    }
+
+    &__trigger {
+        item();
+
+        &::before {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+
+            content: '';
+
+            width: 6px;
+            height: 28px;
+            margin: -14px 0 0 -3px;
+
+            background: #fff;
+            border-radius: 5px;
+            box-shadow: 0 0 2px #999;
+
+            transition-timing-function: inherit;
+            transition-duration: .25s;
+            transition-property: width, height, margin, background-color;
+            transition:
+                .15s width cubic-bezier(.75, 0, .25, 1),
+                .15s height cubic-bezier(.75, 0, .25, 1),
+                .15s margin cubic-bezier(.75, 0, .25, 1),
+                .05s background-color linear;
+        }
+    }
+
+    &__plus,
+    &__minus {
+        item();
+
+        &::before {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+
+            content: '';
+
+            height: 2px;
+            width: 18px;
+
+            margin: -1px 0 0 -9px;
+
+            background: #000;
+        }
+        &:hover::before,
+        &:hover::after {
+            background: #ffce00;
+        }
+
+        &._disabled::before,
+        &._disabled::after {
+            background: #ccc !important;
+        }
+    }
+
+    &__plus {
+        &::after {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+
+            content: '';
+
+            width: 2px;
+            height: 18px;
+
+            margin: -9px 0 0 -1px;
+
+            background: #000;
+        }
+    }
+
+    &__footnotes {
+        item();
+
+        line-height: ($item-height - 2);
+        text-align: center;
+
+        &._mode_appendix &-footnote {
+            vertical-align: super;
+            font-size: 13px;
+        }
+    }
+
+    &__pages {
+        item();
+
+        text-align: center;
+        line-height: $item-height;
+
+        &::before {
+            position: absolute;
+            z-index: 1;
+            top: 0;
+            left: 0;
+
+            content: 'auto';
+
+            width: 100%;
+            height: 100%;
+
+            /* Выравнивает текст по центру */
+            line-height: ($item-height - 8);
+        }
+
+        &-one {
+            width: 8px;
+            height: 14px;
+
+            display: inline-block;
+
+            border: 2px solid #eee;
+        }
+
+        &-two {
+            position: relative;
+
+            width: 12px;
+            height: 14px;
+
+            margin-left: 3px;
+
+            display: inline-block;
+
+            border: 2px solid #eee;
+
+            &::before {
+                position: absolute;
+                left: 50%;
+
+                content: '';
+                margin-left: -1px;
+                width: 2px;
+                height: 100%;
+
+                background: #eee;
+            }
+        }
+
+        &._mode_one::before,
+        &._mode_two::before {
+            display: none;
+        }
+
+        &._mode_one &-one,
+        &._mode_two &-two {
+            border-color: #000;
+            margin-left: 0;
+        }
+        &._mode_two &-two::before {
+            background: #000;
+        }
+
+        &._mode_one &-two {
+            display: none;
+        }
+        &._mode_two &-one {
+            display: none;
+        }
+    }
+
+    &__menu._state_closed {
+        background-color: rgba(127, 127, 127, .5);
+    }
+
+    &__menu._state_closed &__buttons {
+        height: 0 !important;
+    }
+
+    &__buttons {
+        overflow: hidden;
+
+        transition-timing-function: cubic-bezier(.75, 0, .25, 1);
+        transition-duration: .25s;
+        transition-property: height opacity;
+        transform: translateZ(0);
+    }
+
+    &__menu._state_opened {
+        background-color: #fff;
+        box-shadow: rgba(0, 0, 0, .3) 0 1px 4px 0;
+    }
+
+    &__menu._state_opened &__trigger::before {
+        height: 10px;
+        width: 10px;
+        margin: -5px 0 0 -5px;
+        box-shadow: none;
+        background: #000;
+
+        transition:
+            .15s width cubic-bezier(.75, 0, .25, 1),
+            .15s height cubic-bezier(.75, 0, .25, 1),
+            .15s margin cubic-bezier(.75, 0, .25, 1);
+    }
+
+    &__menu._state_opened &__trigger:hover::before {
+        background: #ffce00;
+    }
+
+    &._hidden &__arrow-right {
+        opacity: 0;
+    }
+
+    &__arrow {
+
+        &-left,
+        &-right {
+            position: absolute;
+            top: 90px;
+            bottom: 4px;
+
+            width: $arrowWidth;
+
+            cursor: pointer;
+
+            user-select: none;
+
+            transition: transform .5s ease;
+        }
+
+        &-left:hover &-inner,
+        &-right:hover &-inner {
+            opacity: 1;
+        }
+
+        &-left &-inner,
+        &-right &-inner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+
+            width: $arrowImageWidth;
+            height: $arrowImageHeight;
+            margin-top: -($arrowImageHeight / 2);
+            margin-left: -($arrowImageWidth / 2);
+
+            opacity: .3;
+            background: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iMTMiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCAxMyA0OCI+PHN2ZyB3aWR0aD0iMTMiIGhlaWdodD0iMjQiIGlkPSJhcnJvd19sZWZ0IiB5PSIwIj48cGF0aCBkPSJNMTMgLjY2N0wxMi4zMTYgMCAwIDEyLjAxbC42ODQuNjY3TDEzIC42NjdtMCAyMi42NjZsLS42ODQuNjY3TDAgMTEuOTlsLjY4NC0uNjY3TDEzIDIzLjMzMyIgb3BhY2l0eT0iMSIgZmlsbD0iIzAwMCIvPjwvc3ZnPjxzdmcgd2lkdGg9IjEzIiBoZWlnaHQ9IjI0IiBpZD0iYXJyb3dfcmlnaHQiIHk9IjI0Ij48cGF0aCBkPSJNMCAuNjY3TC42ODQgMCAxMyAxMi4wMWwtLjY4NC42NjdMMCAuNjY3bTAgMjIuNjY2TC42ODQgMjQgMTMgMTEuOTlsLS42ODQtLjY2N0wwIDIzLjMzMyIgb3BhY2l0eT0iMSIgZmlsbD0iIzAwMCIvPjwvc3ZnPjwvc3ZnPgo="); no-repeat;
+
+            transition: opacity .3s ease;
+
+            /*.y-ua_svg_no &  {*/
+                /*background-image: url(images/arrows.png);*/
+            /*}*/
+        }
+
+        &-left._disabled {
+            transform: translateX(-100%);
+        }
+
+        &-left {
+          left: 0;
+        }
+
+        &-right &-inner {
+          background-position: 0 -24px;
+        }
+
+
+        &-right._disabled {
+            transform: translateX(100%);
+        }
+
+        &-right {
+          opacity: 1;
+          right: 0;
+        }
+
+
+    }
+}

@@ -1,0 +1,213 @@
+chitalka_design() {
+    /* Два раза width, потому что деградация */
+    /*width: 700px;*/
+
+    /* 1ch = ширина буквы 0 в данном шрифте, подробнее тут https://developer.mozilla.org/ru/docs/Web/CSS/length */
+    /* заокомментировано на память, когда решим проблему */
+    /*width: 60ch;*/
+    /*width: 650px;*/
+    /* в Войне и мире начинают глючит вычисление whatPageIsDomElem  */
+    /*width: 70ch;*/
+    /*max-width: 700px;*/ /* нужно было, когда размер был в ch */
+    /*height: 800px;*/
+
+    /* Для выравнивания по середие */
+    margin: 0 auto;
+
+    font: 15px/1.4 Arial, sans-serif;
+
+    overflow: hidden;
+
+    color: #333;
+
+    & p {
+        padding: 0;
+        margin: 0;
+        text-align: justify;
+        hyphens: auto;
+    }
+
+    & section {
+        /* ни в коем случае не использовать before, иначе баг в вебките! */
+        -webkit-column-break-after: always;
+        page-break-inside: avoid;
+
+        /* у неправильно размеченных книг и такое бывает */
+        & section {
+            -webkit-column-break-after: auto;
+            page-break-inside: unset;
+        }
+
+        /* Но если вдруг вложена глава, то применяем несколько иные правила */
+        & section.chapter {
+            -webkit-column-break-after: always;
+            page-break-inside: avoid;
+        }
+
+        /* Первая глава наверняка захочет приклеиться к названию части или истории */
+        & section.chapter:first-of-type {
+            column-break-after: auto;
+            page-break-inside: unset;
+        }
+    }
+
+    & .wrapper {
+        -webkit-column-break-after: always;
+        page-break-inside: avoid;
+    }
+
+
+    & .annotation {
+        -webkit-column-break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    ._footnotes_inline & a.footnote {
+        text-decoration: none;
+        color: #333;
+        cursor: text;
+    }
+    ._footnotes_inline & a.footnote:after {
+        content: " [" attr(title) "]";
+    }
+    ._footnotes_inline & a sup {
+        display: none;
+    }
+
+    /* Первый параграф в section, где есть заголовок уровня h1 можно сделать без отступа */
+    & h1 ~ p:first-of-type,
+    /* Для первого параграфа в аннотации книги, где нет тэга h1*/
+    & section.book__annotation > p:first-of-type,
+    & h1 ~ section > p:first-of-type {
+        text-indent: 0;
+    }
+
+    & p {
+        text-indent: 1.3em;
+    }
+
+    & h1 {
+      display: block;
+      font-size: 2.2em;
+      -webkit-margin-before: 1.34em;
+      -webkit-margin-before: 0.67em;
+      font-weight: normal;
+    }
+
+    & section h1:first-of-type {
+        margin-top: 0;
+    }
+
+    & h2,
+    & h3,
+    & h4,
+    & h5 {
+        /* Делаем заранее огромный паддинг */
+        padding-bottom: 2em;
+        /* и притягиваем текст, достигается эффект, при котором не возникает разрыва страницы между заголовком и первым параграфом */
+        margin-bottom: -1em;
+        margin-top: 2em;
+
+        -webkit-column-break-inside: avoid;
+        page-break-inside: avoid;
+    }
+    & h2 + h2,
+    & h3 + h3,
+    & h4 + h4,
+    & h5 + h5 {
+        margin-top: -2em;
+    }
+
+    & .book__cover {
+        position: relative;
+
+        height: 100%;
+    }
+
+    & .book__cover img {
+        position: absolute;
+
+        top: 50%;
+        left: 50%;
+
+        transform: translate(-50%, -50%);
+    }
+
+    & .image-small {
+        margin-bottom: 20px;
+    }
+
+    & .image + br,
+    /**
+     * FIXME: https://st.yandex-team.ru/CHITALKA-85
+     */
+    & .image + p + br {
+        display: none;
+    }
+
+    & .image {
+        display: flex;
+        overflow: hidden;
+        max-height: 100%;
+        max-width: 100%;
+        -webkit-column-break-inside: avoid;
+        page-break-inside: avoid;
+        flex-direction: column;
+
+        box-sizing: border-box;
+        padding: 1em 0;
+    }
+
+    & .image__wrapper {
+        max-width: 100%;
+        max-height: 100%;
+        -webkit-flex-shrink: 1;
+        flex-shrink: 1;
+        overflow: hidden;
+    }
+
+    & .image__annotation {
+        -webkit-flex-shrink: 0;
+                flex-shrink: 0;
+        padding: .5em 0;
+
+        & p {
+            text-align: center;
+            text-indent: 0;
+        }
+    }
+
+    & .image img {
+        display: block;
+        max-height: 100%;
+        max-width: 100%;
+
+        margin: 0 auto;
+
+        pointer-events: none;
+        user-select: none;
+    }
+
+    & .image + p {
+        display: none;
+    }
+
+    & .epigraph {
+        margin: 0 0 2em auto;
+
+        max-width: 20em;
+
+        text-align: right;
+
+        & .author {
+            margin: .5em 0 0;
+        }
+        & p {
+            display: inline-block;
+            max-width: inherit;
+
+            text-indent: 0;
+            text-align: justify;
+        }
+    }
+}

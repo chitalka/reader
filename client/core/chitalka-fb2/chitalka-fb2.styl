@@ -1,0 +1,88 @@
+.chitalka-fb2_default {
+    font-family: Arial, serif;
+
+    min-height: 50ch;
+
+    &__book {
+        height: 100%;
+        width: 100%;
+
+        -webkit-column-count: 2;
+           -moz-column-count: 2;
+                column-count: 2;
+        -webkit-column-gap: 50px;
+           -moz-column-gap: 50px;
+                column-gap: 50px;
+        -webkit-column-axis: horizont;
+           -moz-column-axis: horizont;
+                column-axis: horizont;
+
+        @media (max-width: 1400px) {
+            & {
+                /* Здесь так, потому что вебкит не понимает одну колонку и вытягивает её в высоту */
+                width: 200%;
+                -webkit-column-gap: 40px;
+                   -moz-column-gap: 40px;
+                        column-gap: 40px;
+            }
+        }
+
+        & img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+    }
+
+    &__title {
+        position: relative;
+
+        width: 650px;
+        height 52px;
+        margin: 15px auto 0;
+
+        text-align: center;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+
+        color: #999;
+    }
+
+    &__bookholder {
+        chitalka_design();
+
+        width: 1300px;
+
+        position: absolute;
+        top: 77px;
+        bottom: 60px;
+        left: 81px;
+        right: 81px;
+
+        transform: translateZ(0);
+
+        @media (max-width: 1400px) {
+            width: 650px;
+        }
+    }
+
+    ._pages_one &__book {
+        width: 200%;
+        -webkit-column-gap: 40px;
+           -moz-column-gap: 40px;
+                column-gap: 40px;
+    }
+    ._pages_two &__book {
+        width: 100%;
+        -webkit-column-gap: 50px;
+           -moz-column-gap: 50px;
+                column-gap: 50px;
+    }
+    ._pages_one &__bookholder {
+        width: 650px;
+    }
+    ._pages_two &__bookholder {
+        width: 1300px;
+    }
+}
