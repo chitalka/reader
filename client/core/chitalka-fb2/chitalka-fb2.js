@@ -247,7 +247,10 @@ modules.define(
             // Если есть что восстанавилвать, то идем туда
             if (storagePage) {
                 this._currentPage = storagePage;
-                this._updateScrollPosition(true, true);
+                this._updateScrollPosition({
+                    noAnimation: true,
+                    dontChangeFirstElement: true
+                });
             } else {
                 this._currentPage = 0;
             }
@@ -308,12 +311,18 @@ modules.define(
         _onBookChange: function () {
             var oldPageCount = this._pageCount;
             this._calcDimensions();
-            this._updateScrollPosition(true, true);
+            this._updateScrollPosition({
+                noAnimation: true,
+                dontChangeFirstElement: true
+            });
 
             if (oldPageCount !== this._pageCount) {
                 this._currentPage = this._whatPageIsDOMElem(this._firstElementOnPage);
 
-                this._updateScrollPosition(true, true);
+                this._updateScrollPosition({
+                    noAnimation: true,
+                    dontChangeFirstElement: true
+                });
             }
             /**
              * FIXME: https://st.yandex-team.ru/CHITALKA-84
@@ -586,7 +595,9 @@ modules.define(
                 this._measureReadingTime();
 
                 this._currentPage += this._listBy;
-                this._updateScrollPosition();
+                this._updateScrollPosition({
+                    isNextPage: true
+                });
             }
         },
 
@@ -706,10 +717,14 @@ modules.define(
         /**
          * Изменение страницы
          * Функция в том числе включет пересчет важных параметров и физическое изменение скролла до нужной страницы
-         * @param {Boolean} [noAnimation] – изменить страницу без анимации (по-умолчанию анимация будет)
-         * @param {Boolean} [dontChangeFirstElement] - не пересчитывать первый элемент на странице
+         * @param {Boolean} [params.noAnimation] – изменить страницу без анимации (по-умолчанию анимация будет)
+         * @param {Boolean} [params.dontChangeFirstElement] - не пересчитывать первый элемент на странице
+         * @param {Boolean} [params.isNextPage] - вызван метод ля следующей страницы
          */
-        _updateScrollPosition: function (noAnimation, dontChangeFirstElement) {
+        _updateScrollPosition: function (params) {
+            var noAnimation = params && params.noAnimation;
+            var dontChangeFirstElement = params && params.dontChangeFirstElement;
+
             if (this.isLastPage()) {
                 this._currentPage = this._pageCount - this._listBy;
             }
@@ -741,6 +756,10 @@ modules.define(
                 });
             }
 
+            if (!params || !params.isNextPage) {
+                this._previousPaging = null;
+            }
+
             this.emit('page-changed');
 
             this._storePagePosition();
@@ -756,13 +775,19 @@ modules.define(
 
             // Подстраиваем левые границы для текущей страницы --
             // размеры листа могут поменяться, если в данном браузере работает единица ch
-            this._updateScrollPosition(true, true);
+            this._updateScrollPosition({
+                noAnimation: true,
+                dontChangeFirstElement: true
+            });
 
             // После изменения размеров ищем где теперь находится элемент, который был первым ранее
             this._currentPage = this._whatPageIsDOMElem(this._firstElementOnPage, true);
 
             // Меняем страницу без анимации на ту, где виден элемент
-            this._updateScrollPosition(true, true);
+            this._updateScrollPosition({
+                noAnimation: true,
+                dontChangeFirstElement: true
+            });
         },
 
         /**
