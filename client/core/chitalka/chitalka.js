@@ -236,6 +236,11 @@ modules.define(
         _storeSpeed: function (speed) {
             this._speedAccumulator = this._speedAccumulator || [];
 
+            if (this._speedAccumulator.length > 9) {
+                do {
+                    this._speedAccumulator.shift();
+                } while (this._speedAccumulator.length !== 9);
+            }
             this._speedAccumulator.push(speed);
 
             this._speedAccumulator = this._speedAccumulator.sort(numSort);
