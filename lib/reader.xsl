@@ -26,9 +26,9 @@
                 </section>
             </xsl:for-each>
 
-            <navMap style="display: none;">
-                <xsl:apply-templates select="fb:body" mode="toc"/>
-            </navMap>
+            <!--<navMap style="display: none;">-->
+                <!--<xsl:apply-templates select="fb:body" mode="toc"/>-->
+            <!--</navMap>-->
 
 
             <xsl:for-each select="fb:body">

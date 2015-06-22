@@ -194,6 +194,7 @@ modules.define(
             // связанный баг https://st.yandex-team.ru/CHITALKA-65
             nextTick(function () {
                 this._buildCFIs();
+                this._countSymbols();
                 this._calcDimensions();
 
                 this._restoreSavedPosition();
@@ -301,8 +302,7 @@ modules.define(
             this._pageCount = this._getBookPages();
 
             // Среднее число символов на странице, speedCoeff - эмпирически вычисленный коэффцицент
-            var speedCoeff = (this._pageWidth / (11 * this._fontSize / 16));
-            this._avgSymbolsOnPage = Math.round(Math.floor(this._bookCanvasHeight / this._lineHeight) *  speedCoeff);
+            this._avgSymbolsOnPage = Math.round(this._totalBookSymbols / this._pageCount)
         },
 
         /**
@@ -490,40 +490,31 @@ modules.define(
             parent = parent || this._bookPlaceholder;
             var counter = 1;
             id = id || '/';
-            var totalSymbols = 0;
 
             $(parent).contents().map(function (i, el) {
                 var genID = id + counter;
-                var symbols;
 
                 if (el.nodeType === TEXT_NODE) {
-                    symbols = $.trim(el.textContent).length;
-                    totalSymbols += symbols;
-
                     // оборачиваем только если не пустая нода и не единственная
                     if ($.trim(el.textContent) !== '' && $(parent).size() > 1) {
                         var wrap = $('<span></span>');
                         wrap.attr('data-4cfi', genID);
-                        if (symbols) {
-                            wrap.attr('data-symbols', symbols);
-                        }
-
                         $(el).wrap(wrap);
                         counter++;
                     }
                 } else {
                     $(el).attr('data-4cfi', genID);
 
-                    symbols = this._buildCFIs(el, genID + '/');
-                    totalSymbols += symbols;
-                    if (symbols) {
-                        $(el).attr('data-symbols', symbols);
-                    }
                     counter++;
                 }
             }.bind(this));
+        },
 
-            return totalSymbols;
+        /**
+         * Вычисляет число символов в книге
+         */
+        _countSymbols: function () {
+            this._totalBookSymbols = $.trim(this._bookPlaceholder.get(0).textContent).replace(/\s{2,}/g, ' ').length;
         },
 
         /**

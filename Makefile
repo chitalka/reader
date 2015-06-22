@@ -27,7 +27,8 @@ npm:
 # Build project
 build:
 	$(ENB) make $(ENB_FLAGS)
-	@cp -r lib build/index/lib
+	@rm -rf build/index/lib
+	@cp -rf lib build/index/lib
 	@mv build/index/index.ru.html build/index/index.html
 
 # Clean build results
