@@ -63,7 +63,6 @@ modules.define('test', ['y-extend'], function (provide, extend) {
                 extend(true, target, obj);
                 target.date.should.eq(obj.date);
                 target.div.should.eq(obj.div);
-                target.window.should.eq(obj.window);
             });
         });
     });

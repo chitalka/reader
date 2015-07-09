@@ -23,4 +23,6 @@ module.exports = function(config) {
             //.forServerPage()
             .configureNode(nodeConfig);
     });
+
+    bevisHelper.configureUnitTests('test/client');
 };
