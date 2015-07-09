@@ -3,3 +3,5 @@ node_modules
 build/index/*
 !build/index/i
 !build/index/index.btjson.js
+test/client/*
+!test/client/test.html

@@ -9,7 +9,15 @@
     "vow-fs": "0.3.2",
     "vow": "0.4.4",
     "enb-bevis-helper": "1.1.0",
-    "stylus": "0.47.1"
+    "stylus": "0.47.1",
+    "mocha": "1.20.1",
+    "mocha-phantomjs": "3.5.0",
+    "phantomjs": "1.9.7-12",
+    "sinon": "1.10.2",
+    "chai": "1.9.1"
+  },
+  "scripts": {
+      "test": "make test"
   },
   "enb": {
     "dependencies": [

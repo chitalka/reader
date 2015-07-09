@@ -31,8 +31,13 @@ build:
 	@cp -rf lib build/index/lib
 	@mv build/index/index.ru.html build/index/index.html
 
+# Build and run client tests
+test:
+	$(ENB) make test -n
+	$(NODE_MODULES_BIN)/mocha-phantomjs $(MOCHA_FLAGS) test/client/test.html
+
 # Clean build results
 clean:
 	$(ENB) make clean
 
-.PHONY: all install build clean
+.PHONY: all install build clean test

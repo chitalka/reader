@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Tests</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="../../node_modules/mocha/mocha.css" />
+
+        <script src="../../node_modules/mocha/mocha.js"></script>
+        <script src="../../node_modules/chai/chai.js"></script>
+        <script src="../../node_modules/sinon/pkg/sinon.js"></script>
+
+        <script src="sources.js"></script>
+        <script src="tests.js"></script>
+
+        <script>
+            // default config
+            // @see configs/current/config for more information.
+            modules.define('config', function (provide) {
+                provide({
+                    urls: {
+                        jquery: 'http://yandex.st/jquery/1.10.1/jquery.min.js'
+                    }
+                });
+            });
+
+            mocha.setup('bdd');
+            mocha.checkLeaks();
+            mocha.globals([]);
+
+            chai.config.includeStack = true;
+
+            // Resolve test dependency if `test` module is not found.
+            modules.define('test', function (provide) {
+                provide();
+            });
+
+            var should = chai.should();
+            modules.require(['test'], function () {
+                if (window.mochaPhantomJS) {
+                    mochaPhantomJS.run();
+                } else {
+                    mocha.run();
+                }
+            });
+        </script>
+    </head>
+    <body>
+        <div id="mocha"></div>
+    </body>
+</html>
+
