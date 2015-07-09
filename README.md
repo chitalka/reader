@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/chitalka/reader.svg?branch=master)](https://travis-ci.org/chitalka/reader)
+
 # chitalka
 Welcome to chitalka.js repository. It is a JavaScript-library to read fb2 books.
 
