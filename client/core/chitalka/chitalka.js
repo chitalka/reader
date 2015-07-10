@@ -6,6 +6,7 @@ modules.define(
         'inherit',
         'y-extend',
         'chitalka-ui',
+        'hammer',
         'storage'
     ],
     function (
@@ -15,6 +16,7 @@ modules.define(
         inherit,
         extend,
         ChitalkaUI,
+        Hammer,
         Storage
     ) {
 
@@ -22,6 +24,15 @@ modules.define(
 
     var reportUnimplemented = function (method) {
         throw new Error('UNIMPLEMENTED METHOD: ' + method);
+    };
+
+    /**
+     * Detect if device is touch
+     * @see http://stackoverflow.com/questions/4817029/whats-the-best-way-to-detect-a-touch-screen-device-using-javascript
+     */
+    var isTouch = function () {
+        return 'ontouchstart' in window // works on most browsers 
+            || 'onmsgesturechange' in window; // works on ie10
     };
 
     /**
@@ -117,7 +128,7 @@ modules.define(
             }
 
             if (params.touch) {
-                this._initTouchEvents();
+                isTouch() && this._initTouchEvents();
             }
 
             this._fontSizeLimits = params.fontSize;
@@ -158,6 +169,22 @@ modules.define(
          * в функции выполняется навешивание соответствующих событий
          */
         _initTouchEvents: function () {
+            this._swiper = new Hammer(this.getDomNode()[0]);
+
+            this._swiper.on('swipe', function(e) {
+                var direction = (e.direction === 2)? 'left' : 'right';
+
+                switch (direction) {
+                    case 'left': 
+                        this.nextPage();
+                        break;
+
+                    case 'right': 
+                        this.previousPage();
+                        break;
+                }
+            }.bind(this));
+
         },
 
         _onKeyDown: function (e) {

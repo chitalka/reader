@@ -3,6 +3,7 @@ module.exports = function (bt) {
 
     bt.match('chitalka-fb2*', function (ctx) {
         ctx.setInitOption('keyboard', true);
+        ctx.setInitOption('touch', true);
         ctx.setInitOption('url', ctx.getParam('url'));
         ctx.enableAutoInit();
 
