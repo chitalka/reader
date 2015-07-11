@@ -1,8 +1,8 @@
 {
   "name": "chitalka",
-  "description": "",
-  "version": "1.0.0",
-  "author": "Yandex Maps <mapsui-dev-team.ru>",
+  "description": "JavaScript library to read fb2 books",
+  "version": "0.0.1",
+  "author": "Oleg Mokhov <o.mokhov@ya.ru>",
   "private": true,
   "devDependencies": {
     "inherit": "2.2.2",
