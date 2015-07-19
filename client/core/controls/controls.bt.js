@@ -76,9 +76,11 @@ module.exports = function (bt) {
             items += 2;
 
             content.push({
-                elem: 'plus'
+                elem: 'plus',
+                alt: 'Увеличить размер шрифта'
             }, {
-                elem: 'minus'
+                elem: 'minus',
+                alt: 'Уменьшить размер шрифта'
             });
         }
         if (ctx.getParam('footnotes')) {
@@ -106,6 +108,7 @@ module.exports = function (bt) {
 
     bt.match('controls*__footnotes', function (ctx) {
         ctx.setState('mode', ctx.getParam('footnotes') || 'appendix');
+        ctx.setAttr('title', 'Изменить режим отображения сносок');
         ctx.setContent([{
                 elem: 'footnotes-anchor'
             }, {
@@ -124,11 +127,15 @@ module.exports = function (bt) {
 
     bt.match('controls*__pages', function (ctx) {
         ctx.setState('mode', ctx.getParam('pages') || 'auto');
+        ctx.setAttr('title', 'Изменить режим отображения страниц');
         ctx.setContent([{
                 elem: 'pages-one'
             }, {
                 elem: 'pages-two'
             }
         ]);
+    });
+    bt.match(['controls*__plus', 'controls*__minus'], function (ctx) {
+        ctx.setAttr('title', ctx.getParam('alt'));
     });
 };
