@@ -178,7 +178,6 @@ modules.define(
                 this._fontSize = parseInt(this._bookPlaceholder.css('font-size'), 10);
                 this._settings.save('font-size', this._fontSize);
             }
-            this._lineHeight = parseInt(this._bookPlaceholder.css('line-height'), 10);
             this._annotations = this.getDomNode().find('.annotation');
 
             this._subscribeToWindowEvents();
@@ -199,10 +198,7 @@ modules.define(
 
                 this._restoreSavedPosition();
 
-                this._firstElementOnPage = this._getKeeper();
-
                 this.emit('ready');
-
             }.bind(this));
         },
 
@@ -561,16 +557,19 @@ modules.define(
             if (!domElem) {
                 return;
             }
+
+            var $domElem = $(domElem);
+
             // Элементы, которые не видимы или имеют position отличный
             // от static возвращают неверные координаты, включаем их
             // в boolean флаг preconditions
-            var preconditions = $(domElem).is(':visible') &&
-                ['fixed', 'absolute'].indexOf($(domElem).css('position')) === -1 &&
+            var preconditions = $domElem.is(':visible') &&
+                ['fixed', 'absolute'].indexOf($domElem.css('position')) === -1 &&
                 // Мега костыль, т.к image__wrapper внутри содержить position: absolute элемент,
                 // то это сносит крышу счетоводу
-                !$(domElem).is('.image__wrapper');
+                !$domElem.is('.image__wrapper');
 
-            var pageDelta = Number($(domElem).position().left) / (this._pageWidth + this._gapWidth);
+            var pageDelta = Number($domElem.position().left) / (this._pageWidth + this._gapWidth);
 
             // И если текущий элемент именно такой, то возвращаем 0
             return preconditions ?
