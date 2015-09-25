@@ -116,7 +116,6 @@ modules.define(
          *                 'appendix' – в конце
          */
         _setFootnotesMode: function (mode) {
-            this._subscribeToLinksEvents();
             if (mode === 'inline') {
                 this._footnotesMode = mode;
                 this._setState('footnotes', 'inline');
@@ -181,8 +180,10 @@ modules.define(
             this._annotations = this.getDomNode().find('.annotation');
 
             this._subscribeToWindowEvents();
+            this._subscribeToLinksEvents();
 
             this._setFootnotesMode(this._settings.get('footnotes') || this._getState('footnotes') || 'appendix');
+
             this._setPageViewMode(this._settings.get('pages') || this._getState('pages') || 'auto');
 
             this._storage = new Storage(this.getBookId());
