@@ -502,6 +502,8 @@ modules.define(
                 } else {
                     $(el).attr('data-4cfi', genID);
 
+                    this._buildCFIs(el, genID + '/');
+
                     counter++;
                 }
             }.bind(this));
