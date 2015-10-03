@@ -288,7 +288,7 @@ modules.define(
          */
         _checkSpeed: function () {
             var speedEntries = this._speedAccumulator.length;
-            if (speedEntries > 10) {
+            if (speedEntries >= 10) {
                 this._speedAccumulator = this._speedAccumulator.sort(numSort);
 
                 var median = Math.median(this._speedAccumulator);
