@@ -12,7 +12,7 @@
     "stylus": "0.47.1",
     "mocha": "1.20.1",
     "mocha-phantomjs": "3.5.0",
-    "phantomjs": "1.9.7-12",
+    "phantomjs": "1.9.8",
     "sinon": "1.10.2",
     "chai": "1.9.1"
   },
