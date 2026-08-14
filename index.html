@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f3efe7" />
+    <meta
+      name="description"
+      content="Читалка — локальная браузерная читалка для книг в формате FB2"
+    />
+    <title>Читалка</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <a class="brand" href="/" aria-label="Читалка — на главную">
+          <span class="brand-mark" aria-hidden="true">Ч</span>
+          <span>Читалка</span>
+        </a>
+
+        <div class="book-heading" aria-live="polite">
+          <strong id="book-title">Открываем библиотеку…</strong>
+          <span id="book-author"></span>
+        </div>
+
+        <div class="header-actions">
+          <button
+            id="settings-button"
+            class="icon-button"
+            type="button"
+            aria-label="Настройки чтения"
+            aria-haspopup="dialog"
+            aria-controls="settings-panel"
+            aria-expanded="false"
+          >
+            <svg class="settings-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+          <label class="open-button" for="book-file">
+            <span class="open-button-label">Открыть книгу</span>
+            <span class="open-button-icon" aria-hidden="true">+</span>
+          </label>
+          <input
+            id="book-file"
+            class="visually-hidden"
+            type="file"
+            accept=".fb2,.zip,application/xml,text/xml,application/zip"
+          />
+        </div>
+      </header>
+
+      <div id="settings-backdrop" class="settings-backdrop" hidden></div>
+      <section
+        id="settings-panel"
+        class="settings-panel"
+        role="dialog"
+        aria-labelledby="settings-title"
+        hidden
+      >
+        <div class="settings-panel-header">
+          <h2 id="settings-title">Настройки чтения</h2>
+          <button id="settings-close" class="settings-close" type="button" aria-label="Закрыть настройки">
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+
+        <fieldset class="settings-group">
+          <legend>Размер шрифта</legend>
+          <div class="font-size-control">
+            <button id="font-down" class="setting-step" type="button" aria-label="Уменьшить шрифт">A−</button>
+            <output id="font-size-value" aria-live="polite">18 px</output>
+            <button id="font-up" class="setting-step" type="button" aria-label="Увеличить шрифт">A+</button>
+          </div>
+        </fieldset>
+
+        <fieldset class="settings-group">
+          <legend>Тема</legend>
+          <div class="segmented-control">
+            <label class="setting-option">
+              <input type="radio" name="theme" value="light" />
+              <span>Светлая</span>
+            </label>
+            <label class="setting-option">
+              <input type="radio" name="theme" value="dark" />
+              <span>Тёмная</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="settings-group">
+          <legend>Количество страниц</legend>
+          <div class="segmented-control">
+            <label class="setting-option">
+              <input type="radio" name="page-mode" value="auto" />
+              <span>Авто</span>
+            </label>
+            <label class="setting-option">
+              <input type="radio" name="page-mode" value="one" />
+              <span>1</span>
+            </label>
+            <label class="setting-option">
+              <input type="radio" name="page-mode" value="two" />
+              <span>2</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="settings-group">
+          <legend>Сноски</legend>
+          <div class="segmented-control">
+            <label class="setting-option">
+              <input type="radio" name="footnote-mode" value="appendix" />
+              <span>В конце</span>
+            </label>
+            <label class="setting-option">
+              <input type="radio" name="footnote-mode" value="inline" />
+              <span>В тексте</span>
+            </label>
+          </div>
+        </fieldset>
+      </section>
+
+      <main id="drop-zone" class="reader-shell" aria-busy="true">
+        <section id="reader-status" class="reader-status" role="status">
+          <span class="loader" aria-hidden="true"></span>
+          <p id="status-message">Загружаем демонстрационную книгу…</p>
+        </section>
+
+        <section id="reader" class="reader" hidden aria-label="Текст книги">
+          <div id="book-viewport" class="book-viewport" tabindex="0">
+            <article id="book-content" class="book-content"></article>
+          </div>
+
+          <button id="back-to-text" class="back-to-text" type="button" hidden>
+            Вернуться к тексту
+          </button>
+
+          <footer class="reader-footer">
+            <div class="paging-controls" aria-label="Навигация по книге">
+              <button id="previous-page" class="page-button" type="button" aria-label="Предыдущая страница">
+                <span aria-hidden="true">←</span>
+              </button>
+              <button id="next-page" class="page-button" type="button" aria-label="Следующая страница">
+                <span aria-hidden="true">→</span>
+              </button>
+            </div>
+
+            <div class="progress-group">
+              <div class="progress-copy">
+                <span id="page-label">Страница 1 из 1</span>
+                <span id="time-label">До конца меньше минуты</span>
+              </div>
+              <progress id="book-progress" max="100" value="0">0%</progress>
+            </div>
+
+          </footer>
+        </section>
+
+        <div id="drop-overlay" class="drop-overlay" hidden>
+          <div>
+            <strong>Отпустите книгу здесь</strong>
+            <span>Поддерживаются FB2 и FB2.ZIP</span>
+          </div>
+        </div>
+      </main>
+
+      <div id="toast" class="toast" role="alert" hidden></div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

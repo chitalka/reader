@@ -1,40 +1,26 @@
 {
   "name": "chitalka",
-  "description": "JavaScript library to read fb2 books",
-  "version": "0.0.1",
-  "author": "Oleg Mokhov <o.mokhov@ya.ru>",
+  "version": "1.0.0",
   "private": true,
-  "devDependencies": {
-    "inherit": "2.2.2",
-    "vow-fs": "0.3.2",
-    "vow": "0.4.4",
-    "enb-bevis-helper": "1.1.0",
-    "stylus": "0.47.1",
-    "mocha": "1.20.1",
-    "mocha-phantomjs": "3.5.0",
-    "phantomjs": "1.9.8",
-    "sinon": "1.10.2",
-    "chai": "1.9.1"
-  },
+  "type": "module",
+  "description": "A modern, browser-based FB2 reader",
   "scripts": {
-      "test": "make test"
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
-  "enb": {
-    "dependencies": [
-      "vow",
-      "inherit"
-    ],
-    "sources": [
-      "client/islets/common",
-      "client/islets/core",
-      "client/core"
-    ],
-    "profiles": {
-      "index": {
-        "sources": [
-          "build/index"
-        ]
-      }
-    }
+  "dependencies": {
+    "fflate": "0.8.3"
+  },
+  "devDependencies": {
+    "jsdom": "30.0.1",
+    "typescript": "7.0.2",
+    "vite": "8.2.1",
+    "vitest": "4.1.10"
+  },
+  "engines": {
+    "node": ">=22.22.2"
   }
 }

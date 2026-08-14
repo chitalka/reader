@@ -1,19 +1,57 @@
-[![Build Status](https://travis-ci.org/chitalka/reader.svg?branch=master)](https://travis-ci.org/chitalka/reader)
+# Читалка
 
-# chitalka
-Welcome to chitalka.js repository. It is a JavaScript-library to read fb2 books.
+Современная браузерная читалка для книг в формате FB2. Книга обрабатывается локально: файл не загружается на сервер и может быть открыт как в обычном `.fb2`, так и в `.fb2.zip`.
 
-And [demo](http://chitalka.github.io/demo/), just drag-n-drop fb2-file at your computer to window and read! Or you can read Anna Karenina... :)
+## Возможности
 
-## Project Structure
+- Открытие FB2 и FB2.ZIP через диалог или drag-and-drop.
+- Поддержка UTF-8, UTF-16 и распространённых однобайтовых кодировок, включая Windows-1251.
+- Адаптивный режим одной или двух страниц.
+- Навигация кнопками, стрелками клавиатуры, Page Up/Page Down и свайпом.
+- Масштаб текста, светлая/тёмная тема и два режима сносок.
+- Обложки и иллюстрации, встроенные в FB2.
+- Сохранение настроек и позиции чтения в `localStorage`.
+- Оценка времени до конца книги.
+
+## Стек
+
+- [Vite](https://vite.dev/) — разработка и production-сборка.
+- TypeScript без UI-фреймворка — интерфейс и доменная логика.
+- [fflate](https://github.com/101arrowz/fflate) — распаковка ZIP в браузере.
+- [Vitest](https://vitest.dev/) + jsdom — модульные и интеграционные тесты.
+- GitHub Actions — проверка тестов и сборки.
+
+Минимальная версия Node.js — 22.22.2. Для локальной разработки рекомендуется Node.js 24.
+
+## Запуск
+
+```bash
+npm install
+npm run dev
 ```
-.enb            ENB configuration
-build           BTJSON template and build css, js files output
-client          blocks
-client/core     chitalka.js blocks
-client/islets   islets blocks
-lib             library files and xsl
+
+Vite выведет локальный адрес приложения. По умолчанию открывается демонстрационная «Анна Каренина»; другую книгу можно выбрать кнопкой в шапке.
+
+## Проверка
+
+```bash
+npm test
+npm run build
+npm run preview
 ```
 
-## Build
-Just type at your command line `make` then you need to add route to path `build/index` at your nginx (or etc) config and finally it works
+## Устройство
+
+```text
+src/
+├── fb2/             загрузка, декодирование, разбор и DOM-рендеринг FB2
+├── reader/          пагинация и безопасное локальное хранение
+├── app.ts           пользовательские сценарии и управление интерфейсом
+├── settings.ts      типы и значения настроек
+├── main.ts          точка входа
+└── style.css        адаптивный интерфейс и книжная типографика
+```
+
+FB2 преобразуется в DOM напрямую. Текст добавляется через безопасные DOM API, внешние ссылки ограничены протоколами HTTP, HTTPS и mailto, а исполняемый HTML из книги не вставляется в страницу.
+
+Каталоги `client/` и `lib/`, а также старый BTJSON в `build/index/` сохранены как историческая реализация. Современная сборка их не подключает; из `build/index/` используется только демонстрационная книга.

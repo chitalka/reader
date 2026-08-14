@@ -1,7 +1,6 @@
-node_modules
-.enb/tmp
-build/index/*
-!build/index/i
-!build/index/index.btjson.js
-test/client/*
-!test/client/test.html
+node_modules/
+dist/
+coverage/
+TODO/
+.DS_Store
+*.log
