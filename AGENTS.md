@@ -14,4 +14,5 @@
 - Build the demo from that exact committed reader revision.
 - Replace the contents of `chitalka/demo` with the generated `dist/` output, preserving the demo repository's `.git` directory.
 - Commit and push the demo repository to its `gh-pages` branch.
-- Do not consider the release complete until both pushes succeed.
+- Verify the live GitHub Pages URL loads the generated HTML, JavaScript, and CSS from the `/demo/` path.
+- Do not consider the release complete until both pushes and the live verification succeed.
