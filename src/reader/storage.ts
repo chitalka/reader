@@ -25,6 +25,8 @@ export class JsonStorage<T> {
 export interface BookPosition {
   anchor?: string;
   column: number;
+  chunk?: number;
+  chunkColumn?: number;
 }
 
 export function normalizeBookFilename(filename: string): string {

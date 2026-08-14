@@ -67,6 +67,22 @@ describe('ReaderPager', () => {
     return element;
   }
 
+  function chunk(...children: HTMLElement[]): HTMLElement {
+    const element = document.createElement('div');
+    element.dataset.readerChunk = '';
+    element.append(...children);
+    return element;
+  }
+
+  function chunkedBook(...chunks: HTMLElement[]): DocumentFragment {
+    const fragment = document.createDocumentFragment();
+    const book = document.createElement('div');
+    book.className = 'book';
+    book.append(...chunks);
+    fragment.append(book);
+    return fragment;
+  }
+
   beforeEach(() => {
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);
@@ -227,5 +243,55 @@ describe('ReaderPager', () => {
     pager.next();
 
     expect(pager.getSnapshot().anchor).toBe('visible-on-right');
+  });
+
+  it('mounts only the chunk containing the restored anchor', async () => {
+    const first = chunk(anchor('first', 0, 80));
+    const second = chunk(anchor('restored', 2, 80));
+
+    await pager.setBook(chunkedBook(first, second), { anchor: 'restored' });
+
+    expect(content.querySelectorAll('[data-reader-chunk]')).toHaveLength(1);
+    expect(content.querySelector('[data-reader-anchor="restored"]')).toBe(second.firstElementChild);
+    expect(first.isConnected).toBe(false);
+    expect(second.isConnected).toBe(true);
+    expect(pager.getSnapshot()).toMatchObject({ chunkIndex: 1, anchor: 'restored' });
+  });
+
+  it('moves between chunks without mounting the whole book', async () => {
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 434 });
+    const first = chunk(anchor('first', 0, 80));
+    const second = chunk(anchor('second', 0, 80));
+    await pager.setBook(chunkedBook(first, second));
+
+    pager.next();
+    expect(content.querySelectorAll('[data-reader-chunk]')).toHaveLength(1);
+    expect(second.isConnected).toBe(true);
+    expect(pager.getSnapshot()).toMatchObject({ chunkIndex: 1, anchor: 'second' });
+
+    pager.previous();
+    expect(first.isConnected).toBe(true);
+    expect(second.isConnected).toBe(false);
+    expect(pager.getSnapshot()).toMatchObject({ chunkIndex: 0, anchor: 'first' });
+  });
+
+  it('jumps to a footnote in a detached chunk and returns to the text anchor', async () => {
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 434 });
+    const text = chunk(anchor('reading-place', 0, 80));
+    const noteAnchor = anchor('note-anchor', 0, 80);
+    noteAnchor.id = 'note-1';
+    const notes = chunk(noteAnchor);
+    notes.dataset.readerNotes = '';
+    const fragment = chunkedBook(text, notes);
+    fragment.querySelector<HTMLElement>('.book')?.setAttribute('data-footnotes', 'appendix');
+    await pager.setBook(fragment);
+
+    expect(pager.goToId('note-1')).toBe(true);
+    expect(notes.isConnected).toBe(true);
+    expect(pager.getSnapshot()).toMatchObject({ chunkIndex: 1, anchor: 'note-anchor' });
+
+    expect(pager.goToAnchor('reading-place')).toBe(true);
+    expect(text.isConnected).toBe(true);
+    expect(notes.isConnected).toBe(false);
   });
 });

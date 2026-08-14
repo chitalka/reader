@@ -147,12 +147,21 @@
               </button>
             </div>
 
-            <div class="progress-group">
+            <div id="progress-group" class="progress-group" aria-busy="true">
               <div class="progress-copy">
                 <span id="page-label">Страница 1 из 1</span>
                 <span id="time-label">До конца меньше минуты</span>
               </div>
               <progress id="book-progress" max="100" value="0">0%</progress>
+              <span
+                id="pagination-placeholder"
+                class="pagination-placeholder"
+                role="status"
+                aria-label="Считаем страницы"
+                hidden
+              >
+                <span class="pagination-placeholder-dots" aria-hidden="true"></span>
+              </span>
             </div>
 
           </footer>

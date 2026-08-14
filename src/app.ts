@@ -57,9 +57,11 @@ export class ChitalkaApp {
   private readonly author = requiredElement<HTMLElement>('book-author');
   private readonly previousButton = requiredElement<HTMLButtonElement>('previous-page');
   private readonly nextButton = requiredElement<HTMLButtonElement>('next-page');
+  private readonly progressGroup = requiredElement<HTMLElement>('progress-group');
   private readonly progress = requiredElement<HTMLProgressElement>('book-progress');
   private readonly pageLabel = requiredElement<HTMLElement>('page-label');
   private readonly timeLabel = requiredElement<HTMLElement>('time-label');
+  private readonly paginationPlaceholder = requiredElement<HTMLElement>('pagination-placeholder');
   private readonly fontDownButton = requiredElement<HTMLButtonElement>('font-down');
   private readonly fontUpButton = requiredElement<HTMLButtonElement>('font-up');
   private readonly fontSizeValue = requiredElement<HTMLOutputElement>('font-size-value');
@@ -220,6 +222,7 @@ export class ChitalkaApp {
     this.settingsPanelController.close(false);
     this.isPreparing = true;
     this.currentBookFilename = undefined;
+    this.setPaginationPending(true);
     if (this.savePositionTimer) {
       window.clearTimeout(this.savePositionTimer);
       this.savePositionTimer = undefined;
@@ -245,16 +248,24 @@ export class ChitalkaApp {
   }
 
   private onPageChanged(snapshot: PagerSnapshot): void {
-    const lastPage = Math.min(snapshot.totalPages, snapshot.currentPage + snapshot.pagesPerView - 1);
-    this.pageLabel.textContent = lastPage > snapshot.currentPage
-      ? `Страницы ${snapshot.currentPage}–${lastPage} из ${snapshot.totalPages}`
-      : `Страница ${snapshot.currentPage} из ${snapshot.totalPages}`;
-
-    this.progress.value = snapshot.progress;
-    this.progress.textContent = `${Math.round(snapshot.progress)}%`;
     this.previousButton.disabled = this.pager.isFirst();
     this.nextButton.disabled = this.pager.isLast();
-    this.updateTimeEstimate(snapshot.progress);
+
+    if (snapshot.paginationExact) {
+      const lastPage = Math.min(
+        snapshot.totalPages,
+        snapshot.currentPage + snapshot.pagesPerView - 1,
+      );
+      this.pageLabel.textContent = lastPage > snapshot.currentPage
+        ? `Страницы ${snapshot.currentPage}–${lastPage} из ${snapshot.totalPages}`
+        : `Страница ${snapshot.currentPage} из ${snapshot.totalPages}`;
+      this.progress.value = snapshot.progress;
+      this.progress.textContent = `${Math.round(snapshot.progress)}%`;
+      this.updateTimeEstimate(snapshot.progress);
+      this.setPaginationPending(false);
+    } else {
+      this.setPaginationPending(true);
+    }
 
     if (this.currentBookFilename && !this.isPreparing) {
       if (this.savePositionTimer) window.clearTimeout(this.savePositionTimer);
@@ -263,9 +274,17 @@ export class ChitalkaApp {
         positionStorage(this.currentBookFilename).write({
           anchor: snapshot.anchorVisible ? snapshot.anchor : undefined,
           column: snapshot.currentPage - 1,
+          chunk: snapshot.chunkIndex,
+          chunkColumn: snapshot.chunkPage - 1,
         });
       }, 250);
     }
+  }
+
+  private setPaginationPending(pending: boolean): void {
+    this.progressGroup.classList.toggle('is-pending', pending);
+    this.progressGroup.setAttribute('aria-busy', String(pending));
+    this.paginationPlaceholder.hidden = !pending;
   }
 
   private updateTimeEstimate(progress: number): void {
@@ -338,20 +357,14 @@ export class ChitalkaApp {
 
     if (this.settings.footnoteMode === 'inline') return;
     const id = decodeURIComponent(link.hash.slice(1));
-    const target = document.getElementById(id);
-    if (!target || !this.content.contains(target)) return;
-
     this.backAnchor = this.pager.getSnapshot().anchor;
-    this.pager.goToElement(target);
+    if (!this.pager.goToId(id)) return;
     this.backButton.hidden = !this.backAnchor;
   }
 
   private returnFromFootnote(): void {
     if (!this.backAnchor) return;
-    const target = Array.from(
-      this.content.querySelectorAll<HTMLElement>('[data-reader-anchor]'),
-    ).find((candidate) => candidate.dataset.readerAnchor === this.backAnchor);
-    if (target) this.pager.goToElement(target);
+    this.pager.goToAnchor(this.backAnchor);
     this.backAnchor = undefined;
     this.backButton.hidden = true;
   }

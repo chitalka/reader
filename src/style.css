@@ -471,6 +471,20 @@ button:disabled {
   color: var(--text);
 }
 
+.book-chunk {
+  display: contents;
+}
+
+.reader-measurer {
+  position: fixed !important;
+  z-index: -1;
+  top: 0;
+  left: -100000px;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .book p {
   margin: 0 0 0.75em;
   text-align: justify;
@@ -667,7 +681,53 @@ button:disabled {
 }
 
 .progress-group {
+  position: relative;
   min-width: 0;
+}
+
+.progress-group.is-pending .progress-copy,
+.progress-group.is-pending progress {
+  visibility: hidden;
+}
+
+.pagination-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.pagination-placeholder[hidden] {
+  display: none;
+}
+
+.pagination-placeholder-dots {
+  width: 3ch;
+  text-align: left;
+}
+
+.pagination-placeholder-dots::after {
+  content: ".";
+  animation: pagination-dots 1.2s step-end infinite;
+}
+
+@keyframes pagination-dots {
+  0%,
+  32% {
+    content: ".";
+  }
+
+  33%,
+  65% {
+    content: "..";
+  }
+
+  66%,
+  100% {
+    content: "...";
+  }
 }
 
 .progress-copy {

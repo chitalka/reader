@@ -54,4 +54,29 @@ describe('FB2 DOM renderer', () => {
 
     expect(unsafeLink?.hasAttribute('href')).toBe(false);
   });
+
+  it('splits oversized sections into bounded render chunks', () => {
+    const paragraphs = Array.from(
+      { length: 205 },
+      (_, index) => `<p>Абзац ${index + 1}</p>`,
+    ).join('');
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
+        <description>
+          <title-info><book-title>Большая книга</book-title><lang>ru</lang></title-info>
+          <document-info><id>large-book</id></document-info>
+        </description>
+        <body><section>${paragraphs}</section></body>
+      </FictionBook>`;
+
+    const rendered = renderFb2(parseFb2(xml));
+    const chunks = Array.from(
+      rendered.fragment.querySelectorAll<HTMLElement>('[data-reader-chunk]'),
+    );
+
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((chunk) => chunk.querySelectorAll('[data-reader-anchor]').length <= 96))
+      .toBe(true);
+    expect(rendered.fragment.querySelectorAll('[data-reader-anchor]')).toHaveLength(206);
+  });
 });

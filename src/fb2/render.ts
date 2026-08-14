@@ -23,6 +23,8 @@ const BLOCK_TAGS = new Set([
   'epigraph',
 ]);
 
+const MAX_CHUNK_ANCHORS = 96;
+
 function safeExternalUrl(value: string): string | undefined {
   try {
     const url = new URL(value, window.location.href);
@@ -227,9 +229,92 @@ export function renderFb2(parsed: ParsedBook): RenderedBook {
     return target;
   };
 
+  const anchorCount = (element: HTMLElement): number => (
+    (element.dataset.readerAnchor === undefined ? 0 : 1)
+    + element.querySelectorAll('[data-reader-anchor]').length
+  );
+
+  const splitOversizedNode = (element: HTMLElement): HTMLElement[] => {
+    if (anchorCount(element) <= MAX_CHUNK_ANCHORS) return [element];
+
+    const pieces: HTMLElement[] = [];
+    let isFirstPiece = true;
+    const createShell = (): HTMLElement => {
+      const shell = element.cloneNode(false) as HTMLElement;
+      if (!isFirstPiece) {
+        shell.removeAttribute('id');
+        delete shell.dataset.readerAnchor;
+      }
+      isFirstPiece = false;
+      return shell;
+    };
+
+    let shell = createShell();
+    let shellAnchors = shell.dataset.readerAnchor === undefined ? 0 : 1;
+    const flush = (): void => {
+      if (shell.childNodes.length) pieces.push(shell);
+      shell = createShell();
+      shellAnchors = 0;
+    };
+
+    for (const child of Array.from(element.childNodes)) {
+      if (child instanceof HTMLElement && anchorCount(child) > MAX_CHUNK_ANCHORS) {
+        for (const childPiece of splitOversizedNode(child)) {
+          const childAnchors = anchorCount(childPiece);
+          if (shell.childNodes.length && shellAnchors + childAnchors > MAX_CHUNK_ANCHORS) flush();
+          shell.append(childPiece);
+          shellAnchors += childAnchors;
+          if (shellAnchors >= MAX_CHUNK_ANCHORS) flush();
+        }
+        continue;
+      }
+
+      const childAnchors = child instanceof HTMLElement ? anchorCount(child) : 0;
+      if (shell.childNodes.length && shellAnchors + childAnchors > MAX_CHUNK_ANCHORS) flush();
+      shell.append(child);
+      shellAnchors += childAnchors;
+    }
+    if (shell.childNodes.length) pieces.push(shell);
+    return pieces;
+  };
+
   const article = htmlDocument.createElement('div');
   article.className = 'book';
   article.lang = parsed.metadata.language || 'ru';
+  const mainNodes: HTMLElement[] = [];
+
+  const appendChunks = (nodes: HTMLElement[], notes = false): void => {
+    let pending: HTMLElement[] = [];
+    let pendingAnchors = 0;
+    let pendingSections = 0;
+    const flush = (): void => {
+      if (!pending.length) return;
+      const chunk = htmlDocument.createElement(notes ? 'aside' : 'div');
+      chunk.className = notes ? 'book-chunk book-notes' : 'book-chunk';
+      chunk.dataset.readerChunk = '';
+      if (notes) {
+        chunk.dataset.readerNotes = '';
+        chunk.setAttribute('aria-label', 'Сноски');
+      }
+      chunk.append(...pending);
+      article.append(chunk);
+      pending = [];
+      pendingAnchors = 0;
+      pendingSections = 0;
+    };
+
+    for (const node of nodes.flatMap(splitOversizedNode)) {
+      const nodeAnchors = anchorCount(node);
+      if (pending.length && pendingAnchors + nodeAnchors > MAX_CHUNK_ANCHORS) flush();
+      pending.push(node);
+      pendingAnchors += nodeAnchors;
+      if (node.classList.contains('book-section')) {
+        pendingSections += 1;
+        if (!notes || pendingSections >= 12 || pendingAnchors >= MAX_CHUNK_ANCHORS) flush();
+      }
+    }
+    flush();
+  };
 
   const titleInfo = descendantElement(parsed.document, 'title-info');
   const coverPage = titleInfo && childElement(titleInfo, 'coverpage');
@@ -238,7 +323,7 @@ export function renderFb2(parsed: ParsedBook): RenderedBook {
     const renderedCover = renderImage(coverImage);
     if (renderedCover) {
       renderedCover.classList.add('book-cover');
-      article.append(renderedCover);
+      mainNodes.push(renderedCover);
     }
   }
 
@@ -248,22 +333,32 @@ export function renderFb2(parsed: ParsedBook): RenderedBook {
     annotationElement.className = 'book-annotation';
     addAnchor(annotationElement);
     appendChildren(annotation, annotationElement, 1);
-    article.append(annotationElement);
+    mainNodes.push(annotationElement);
   }
 
   for (const body of bodies.filter((candidate) => candidate !== notesBody)) {
-    const bodyElement = htmlDocument.createElement('div');
-    bodyElement.className = 'book-body';
-    appendChildren(body, bodyElement, 0);
-    article.append(bodyElement);
+    for (const child of Array.from(body.childNodes)) {
+      const rendered = renderNode(child, 0);
+      if (rendered instanceof HTMLElement) {
+        mainNodes.push(rendered);
+      } else if (rendered?.textContent?.trim()) {
+        const wrapper = htmlDocument.createElement('p');
+        addAnchor(wrapper);
+        wrapper.append(rendered);
+        mainNodes.push(wrapper);
+      }
+    }
   }
+  appendChunks(mainNodes);
 
   if (notesBody) {
-    const notesElement = htmlDocument.createElement('aside');
-    notesElement.className = 'book-notes';
-    notesElement.setAttribute('aria-label', 'Сноски');
-    appendChildren(notesBody, notesElement, 0);
-    article.append(notesElement);
+    const noteNodes: HTMLElement[] = [];
+    for (const child of Array.from(notesBody.childNodes)) {
+      const rendered = renderNode(child, 0);
+      if (!rendered || !rendered.textContent?.trim()) continue;
+      if (rendered instanceof HTMLElement) noteNodes.push(rendered);
+    }
+    appendChunks(noteNodes, true);
   }
 
   const fragment = htmlDocument.createDocumentFragment();
