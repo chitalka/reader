@@ -1,22 +1,13 @@
 export const FB2_NAMESPACE = 'http://www.gribuser.ru/xml/fictionbook/2.0';
 export const XLINK_NAMESPACE = 'http://www.w3.org/1999/xlink';
 
-export interface BookMetadata {
-  id: string;
-  title: string;
-  authors: string[];
-  language?: string;
-}
+export { normalizedText, type BookMetadata, type RenderedBook } from '../book/model';
+
+import type { BookMetadata } from '../book/model';
 
 export interface ParsedBook {
   document: XMLDocument;
   metadata: BookMetadata;
-}
-
-export interface RenderedBook {
-  fragment: DocumentFragment;
-  metadata: BookMetadata;
-  wordCount: number;
 }
 
 export function elementChildren(parent: Element | XMLDocument): Element[] {
@@ -33,8 +24,4 @@ export function childElements(parent: Element, localName: string): Element[] {
 
 export function descendantElement(parent: Element | XMLDocument, localName: string): Element | undefined {
   return Array.from(parent.getElementsByTagNameNS('*', localName))[0];
-}
-
-export function normalizedText(node: Node | null | undefined): string {
-  return node?.textContent?.replace(/\s+/gu, ' ').trim() ?? '';
 }

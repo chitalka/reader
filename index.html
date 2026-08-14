@@ -6,13 +6,13 @@
     <meta name="theme-color" content="#f3efe7" />
     <meta
       name="description"
-      content="Читалка — локальная браузерная читалка для книг в формате FB2"
+      content="Читалка — локальная браузерная читалка для книг в форматах FB2 и EPUB"
     />
     <title>Читалка</title>
   </head>
   <body>
     <div id="app">
-      <header class="app-header">
+      <header id="app-header" class="app-header">
         <a class="brand" href="/" aria-label="Читалка — на главную">
           <span class="brand-mark" aria-hidden="true">Ч</span>
           <span>Читалка</span>
@@ -46,7 +46,7 @@
             id="book-file"
             class="visually-hidden"
             type="file"
-            accept=".fb2,.zip,application/xml,text/xml,application/zip"
+            accept=".fb2,.zip,.epub,application/xml,text/xml,application/zip,application/epub+zip"
           />
         </div>
       </header>
@@ -120,6 +120,24 @@
             </label>
           </div>
         </fieldset>
+
+        <fieldset class="settings-group">
+          <legend>Стрелки перелистывания</legend>
+          <div class="segmented-control">
+            <label class="setting-option">
+              <input type="radio" name="page-buttons" value="auto" />
+              <span>Авто</span>
+            </label>
+            <label class="setting-option">
+              <input type="radio" name="page-buttons" value="show" />
+              <span>Показывать</span>
+            </label>
+            <label class="setting-option">
+              <input type="radio" name="page-buttons" value="hide" />
+              <span>Скрывать</span>
+            </label>
+          </div>
+        </fieldset>
       </section>
 
       <main id="drop-zone" class="reader-shell" aria-busy="true">
@@ -129,7 +147,7 @@
         </section>
 
         <section id="reader" class="reader" hidden aria-label="Текст книги">
-          <div id="book-viewport" class="book-viewport" tabindex="0">
+          <div id="book-viewport" class="book-viewport">
             <article id="book-content" class="book-content"></article>
           </div>
 
@@ -170,7 +188,7 @@
         <div id="drop-overlay" class="drop-overlay" hidden>
           <div>
             <strong>Отпустите книгу здесь</strong>
-            <span>Поддерживаются FB2 и FB2.ZIP</span>
+            <span>Поддерживаются FB2, FB2.ZIP и EPUB</span>
           </div>
         </div>
       </main>

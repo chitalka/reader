@@ -6,6 +6,7 @@ describe('ReaderPager', () => {
   let content: HTMLElement;
   let snapshots: PagerSnapshot[];
   let pager: ReaderPager;
+  let animateDescriptor: PropertyDescriptor | undefined;
 
   function anchor(id: string, page: number, top: number): HTMLElement {
     const element = document.createElement('div');
@@ -84,6 +85,7 @@ describe('ReaderPager', () => {
   }
 
   beforeEach(() => {
+    animateDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'animate');
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);
       return 1;
@@ -125,6 +127,11 @@ describe('ReaderPager', () => {
 
   afterEach(() => {
     pager.destroy();
+    if (animateDescriptor) {
+      Object.defineProperty(HTMLElement.prototype, 'animate', animateDescriptor);
+    } else {
+      delete (HTMLElement.prototype as { animate?: unknown }).animate;
+    }
     vi.unstubAllGlobals();
     document.body.replaceChildren();
   });
@@ -151,6 +158,22 @@ describe('ReaderPager', () => {
     pager.previous();
     expect(pager.getSnapshot().currentPage).toBe(3);
     expect(snapshots.length).toBeGreaterThan(3);
+  });
+
+  it('accumulates rapid page turns without smooth-scroll restarts', async () => {
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 4962 });
+    await pager.setBook(document.createDocumentFragment());
+
+    pager.next();
+    pager.next();
+    pager.next();
+    pager.next();
+
+    expect(pager.getSnapshot().currentPage).toBe(9);
+    const scrollCalls = vi.mocked(viewport.scrollTo).mock.calls
+      .map(([options]) => options as ScrollToOptions);
+    expect(scrollCalls.at(-1)).toMatchObject({ left: 4528, behavior: 'auto' });
+    expect(scrollCalls.every((options) => options.behavior !== 'smooth')).toBe(true);
   });
 
   it('stores the first anchor whose top-left corner is visible in the spread', async () => {
@@ -273,6 +296,49 @@ describe('ReaderPager', () => {
     expect(first.isConnected).toBe(true);
     expect(second.isConnected).toBe(false);
     expect(pager.getSnapshot()).toMatchObject({ chunkIndex: 0, anchor: 'first' });
+  });
+
+  it('queues rapid turns while a chapter transition is running', async () => {
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 434 });
+    const pendingAnimations: Array<{
+      animation: Animation;
+      finish: () => void;
+    }> = [];
+    Object.defineProperty(HTMLElement.prototype, 'animate', {
+      configurable: true,
+      value: vi.fn(() => {
+        let finish = (): void => undefined;
+        const finished = new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+        const animation = {
+          cancel: vi.fn(),
+          finished,
+          playbackRate: 1,
+        } as unknown as Animation;
+        pendingAnimations.push({ animation, finish });
+        return animation;
+      }),
+    });
+    const first = chunk(anchor('first', 0, 80));
+    const second = chunk(anchor('second', 0, 80));
+    const third = chunk(anchor('third', 0, 80));
+    await pager.setBook(chunkedBook(first, second, third));
+
+    pager.next();
+    pager.next();
+
+    expect(pager.getSnapshot().chunkIndex).toBe(1);
+    expect(pendingAnimations).toHaveLength(2);
+    expect(pendingAnimations.every(({ animation }) => animation.playbackRate === 1.5)).toBe(true);
+
+    pendingAnimations.slice(0, 2).forEach(({ finish }) => finish());
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(pager.getSnapshot().chunkIndex).toBe(2);
+    expect(third.isConnected).toBe(true);
+    expect(pendingAnimations).toHaveLength(4);
   });
 
   it('jumps to a footnote in a detached chunk and returns to the text anchor', async () => {

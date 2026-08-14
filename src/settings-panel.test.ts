@@ -92,4 +92,19 @@ describe('SettingsPanelController', () => {
     expect(panel.hidden).toBe(true);
     expect(backdrop.hidden).toBe(true);
   });
+
+  it('reports open state changes', () => {
+    controller.destroy();
+    const onOpenChange = vi.fn();
+    controller = new SettingsPanelController(
+      { button, panel, backdrop, closeButton },
+      onOpenChange,
+    );
+
+    button.click();
+    closeButton.click();
+
+    expect(onOpenChange).toHaveBeenNthCalledWith(1, true);
+    expect(onOpenChange).toHaveBeenNthCalledWith(2, false);
+  });
 });

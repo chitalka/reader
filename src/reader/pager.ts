@@ -40,6 +40,9 @@ interface IdleCallbacks {
   cancelIdleCallback?: (handle: number) => void;
 }
 
+const PAGE_TURN_DURATION = 260;
+const PAGE_TURN_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+
 export class ReaderPager {
   private currentColumn = 0;
   private currentChunkIndex = 0;
@@ -67,6 +70,12 @@ export class ReaderPager {
   private measurementHandle?: number;
   private measurementUsesIdleCallback = false;
   private bookGeneration = 0;
+  private pageAnimation?: Animation;
+  private chunkAnimations: Animation[] = [];
+  private transitionLayer?: HTMLElement;
+  private transitionGeneration = 0;
+  private transitioning = false;
+  private pendingSteps = 0;
 
   constructor(
     private readonly viewport: HTMLElement,
@@ -87,11 +96,13 @@ export class ReaderPager {
     if (this.resizeFrame) cancelAnimationFrame(this.resizeFrame);
     this.bookGeneration += 1;
     this.cancelMeasurements();
+    this.cancelNavigationAnimations();
   }
 
   async setBook(fragment: DocumentFragment, restore?: RestorePosition): Promise<void> {
     const generation = ++this.bookGeneration;
     this.cancelMeasurements();
+    this.cancelNavigationAnimations();
     this.layoutPageCountCache.clear();
     this.chunkPageCounts.clear();
     this.anchorElements.clear();
@@ -139,54 +150,34 @@ export class ReaderPager {
 
   setPageMode(mode: PageMode): void {
     if (this.pageMode === mode) return;
+    this.cancelNavigationAnimations();
     this.pageMode = mode;
     this.scheduleLayout();
   }
 
   setFontSize(size: number): void {
     if (this.fontSize === size) return;
+    this.cancelNavigationAnimations();
     this.fontSize = size;
     this.content.style.fontSize = `${size}px`;
     this.scheduleLayout();
   }
 
   relayout(): void {
+    this.cancelNavigationAnimations();
     this.scheduleLayout();
   }
 
   next(): void {
-    if (this.currentColumn < this.lastSpreadStart()) {
-      this.currentColumn = Math.min(this.lastSpreadStart(), this.currentColumn + this.pagesPerView);
-      this.moveToCurrent(true, true);
-      return;
-    }
-
-    const nextChunk = this.adjacentChunk(1);
-    if (nextChunk === undefined) return;
-    this.activeAnchor = undefined;
-    this.mountChunk(nextChunk);
-    this.performLayout({ chunk: nextChunk, chunkColumn: 0 });
-    this.captureVisibleAnchor();
-    this.moveToCurrent(false);
+    this.requestStep(1);
   }
 
   previous(): void {
-    if (this.currentColumn > 0) {
-      this.currentColumn = Math.max(0, this.currentColumn - this.pagesPerView);
-      this.moveToCurrent(true, true);
-      return;
-    }
-
-    const previousChunk = this.adjacentChunk(-1);
-    if (previousChunk === undefined) return;
-    this.activeAnchor = undefined;
-    this.mountChunk(previousChunk);
-    this.performLayout({ chunk: previousChunk, chunkColumn: Number.MAX_SAFE_INTEGER });
-    this.captureVisibleAnchor();
-    this.moveToCurrent(false);
+    this.requestStep(-1);
   }
 
   first(): void {
+    this.cancelNavigationAnimations();
     const firstChunk = this.navigationChunks[0];
     if (firstChunk === undefined) return;
     this.activeAnchor = undefined;
@@ -197,6 +188,7 @@ export class ReaderPager {
   }
 
   last(): void {
+    this.cancelNavigationAnimations();
     const lastChunk = this.navigationChunks.at(-1);
     if (lastChunk === undefined) return;
     this.activeAnchor = undefined;
@@ -218,6 +210,7 @@ export class ReaderPager {
   goToElement(element: HTMLElement): void {
     const chunkIndex = this.chunkForElement(element);
     if (chunkIndex === undefined || !this.navigationChunks.includes(chunkIndex)) return;
+    this.cancelNavigationAnimations();
     this.activeAnchor = element.dataset.readerAnchor;
     if (chunkIndex !== this.currentChunkIndex) this.mountChunk(chunkIndex);
     this.performLayout({ anchor: this.activeAnchor, chunk: chunkIndex });
@@ -236,6 +229,7 @@ export class ReaderPager {
     const element = this.idElements.get(id);
     const chunkIndex = this.idChunks.get(id);
     if (!element || chunkIndex === undefined || !this.navigationChunks.includes(chunkIndex)) return false;
+    this.cancelNavigationAnimations();
     if (chunkIndex !== this.currentChunkIndex) this.mountChunk(chunkIndex);
     this.activeAnchor = element.dataset.readerAnchor
       ?? element.querySelector<HTMLElement>('[data-reader-anchor]')?.dataset.readerAnchor;
@@ -348,7 +342,7 @@ export class ReaderPager {
     this.currentChunkIndex = chunkIndex;
     this.currentColumn = 0;
     this.pageCount = 1;
-    this.viewport.scrollTo({ left: 0, behavior: 'instant' });
+    this.viewport.scrollTo({ left: 0, behavior: 'auto' });
     this.bookRoot.replaceChildren(chunk.element);
   }
 
@@ -357,8 +351,51 @@ export class ReaderPager {
     return this.navigationChunks[index + direction];
   }
 
+  private requestStep(direction: -1 | 1): void {
+    if (this.transitioning) {
+      this.pendingSteps += direction;
+      this.accelerateChunkTransition();
+      return;
+    }
+    this.step(direction);
+  }
+
+  private step(direction: -1 | 1): boolean {
+    if (direction > 0 && this.currentColumn < this.lastSpreadStart()) {
+      this.currentColumn = Math.min(this.lastSpreadStart(), this.currentColumn + this.pagesPerView);
+      this.moveToCurrent(true, true);
+      return true;
+    }
+    if (direction < 0 && this.currentColumn > 0) {
+      this.currentColumn = Math.max(0, this.currentColumn - this.pagesPerView);
+      this.moveToCurrent(true, true);
+      return true;
+    }
+
+    const adjacent = this.adjacentChunk(direction);
+    if (adjacent === undefined) return false;
+    this.transitionToChunk(
+      adjacent,
+      direction > 0 ? 0 : Number.MAX_SAFE_INTEGER,
+      direction,
+    );
+    return true;
+  }
+
+  private flushPendingSteps(): void {
+    while (!this.transitioning && this.pendingSteps !== 0) {
+      const direction = Math.sign(this.pendingSteps) as -1 | 1;
+      this.pendingSteps -= direction;
+      if (!this.step(direction)) {
+        this.pendingSteps = 0;
+        break;
+      }
+    }
+  }
+
   private scheduleLayout(): void {
     if (!this.bookRoot || !this.chunks.length) return;
+    this.cancelNavigationAnimations();
     if (this.resizeFrame) cancelAnimationFrame(this.resizeFrame);
     this.resizeFrame = requestAnimationFrame(() => {
       this.resizeFrame = undefined;
@@ -547,9 +584,164 @@ export class ReaderPager {
 
   private moveToCurrent(smooth: boolean, captureAnchor = false): void {
     const left = this.currentColumn * this.pageExtent;
-    this.viewport.scrollTo({ left, behavior: smooth ? 'smooth' : 'instant' });
+    if (smooth) this.animateScrollTo(left);
+    else {
+      this.cancelPageAnimation();
+      this.viewport.scrollTo({ left, behavior: 'auto' });
+    }
     if (captureAnchor) this.captureVisibleAnchor();
     this.onChange(this.getSnapshot());
+  }
+
+  private animateScrollTo(left: number): void {
+    const previousLeft = this.viewport.scrollLeft;
+    const animatedOffset = this.currentAnimatedOffset();
+    this.cancelPageAnimation();
+    this.viewport.scrollTo({ left, behavior: 'auto' });
+
+    const startOffset = animatedOffset + left - previousLeft;
+    if (
+      Math.abs(startOffset) < 0.5
+      || this.prefersReducedMotion()
+      || typeof this.content.animate !== 'function'
+    ) return;
+
+    const spreadDistance = Math.max(1, this.pageExtent * this.pagesPerView);
+    const queuedSpreads = Math.max(1, Math.abs(startOffset) / spreadDistance);
+    const duration = Math.max(90, Math.round(PAGE_TURN_DURATION / Math.sqrt(queuedSpreads)));
+    const animation = this.content.animate(
+      [
+        { transform: `translateX(${startOffset}px)` },
+        { transform: 'translateX(0)' },
+      ],
+      { duration, easing: PAGE_TURN_EASING },
+    );
+    this.pageAnimation = animation;
+    void animation.finished.then(() => {
+      if (this.pageAnimation === animation) this.pageAnimation = undefined;
+    }).catch(() => undefined);
+  }
+
+  private transitionToChunk(
+    chunkIndex: number,
+    chunkColumn: number,
+    direction: -1 | 1,
+  ): void {
+    const generation = ++this.transitionGeneration;
+    const layer = this.createTransitionLayer();
+    this.transitioning = true;
+    this.activeAnchor = undefined;
+    this.mountChunk(chunkIndex);
+    this.performLayout({ chunk: chunkIndex, chunkColumn });
+    this.captureVisibleAnchor();
+    this.moveToCurrent(false);
+
+    const distance = Math.max(this.viewport.clientWidth, this.pageExtent * this.pagesPerView);
+    if (
+      !layer
+      || this.prefersReducedMotion()
+      || typeof this.content.animate !== 'function'
+      || typeof layer.animate !== 'function'
+    ) {
+      this.finishChunkTransition(generation);
+      return;
+    }
+
+    const options: KeyframeAnimationOptions = {
+      duration: PAGE_TURN_DURATION,
+      easing: PAGE_TURN_EASING,
+      fill: 'both',
+    };
+    this.chunkAnimations = [
+      layer.animate(
+        [
+          { transform: 'translateX(0)' },
+          { transform: `translateX(${-direction * distance}px)` },
+        ],
+        options,
+      ),
+      this.content.animate(
+        [
+          { transform: `translateX(${direction * distance}px)` },
+          { transform: 'translateX(0)' },
+        ],
+        options,
+      ),
+    ];
+    void Promise.allSettled(this.chunkAnimations.map((animation) => animation.finished))
+      .then(() => this.finishChunkTransition(generation));
+  }
+
+  private createTransitionLayer(): HTMLElement | undefined {
+    if (!this.bookRoot) return undefined;
+    const previousLeft = this.viewport.scrollLeft;
+    const animatedOffset = this.currentAnimatedOffset();
+    this.cancelPageAnimation();
+
+    const layer = document.createElement('div');
+    layer.className = 'reader-transition-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    layer.setAttribute('inert', '');
+    const clone = this.content.cloneNode(true) as HTMLElement;
+    clone.removeAttribute('id');
+    for (const element of Array.from(clone.querySelectorAll<HTMLElement>('[id]'))) {
+      element.removeAttribute('id');
+    }
+    if (Math.abs(animatedOffset) >= 0.5) {
+      clone.style.transform = `translateX(${animatedOffset}px)`;
+    }
+    layer.append(clone);
+    this.viewport.append(layer);
+    layer.scrollLeft = previousLeft;
+    this.transitionLayer = layer;
+    return layer;
+  }
+
+  private finishChunkTransition(generation: number): void {
+    if (generation !== this.transitionGeneration) return;
+    for (const animation of this.chunkAnimations) animation.cancel();
+    this.chunkAnimations = [];
+    this.transitionLayer?.remove();
+    this.transitionLayer = undefined;
+    this.transitioning = false;
+    this.flushPendingSteps();
+  }
+
+  private accelerateChunkTransition(): void {
+    const playbackRate = Math.min(4, 1 + Math.abs(this.pendingSteps) * 0.5);
+    for (const animation of this.chunkAnimations) animation.playbackRate = playbackRate;
+  }
+
+  private currentAnimatedOffset(): number {
+    if (!this.pageAnimation) return 0;
+    const transform = getComputedStyle(this.content).transform;
+    if (!transform || transform === 'none') return 0;
+    const matrixValues = transform.slice(transform.indexOf('(') + 1, transform.lastIndexOf(')'));
+    const values = matrixValues.match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/giu)?.map(Number) ?? [];
+    if (transform.startsWith('matrix3d(')) return values[12] ?? 0;
+    if (transform.startsWith('matrix(')) return values[4] ?? 0;
+    return 0;
+  }
+
+  private prefersReducedMotion(): boolean {
+    return typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  private cancelPageAnimation(): void {
+    this.pageAnimation?.cancel();
+    this.pageAnimation = undefined;
+  }
+
+  private cancelNavigationAnimations(): void {
+    this.transitionGeneration += 1;
+    this.cancelPageAnimation();
+    for (const animation of this.chunkAnimations) animation.cancel();
+    this.chunkAnimations = [];
+    this.transitionLayer?.remove();
+    this.transitionLayer = undefined;
+    this.transitioning = false;
+    this.pendingSteps = 0;
   }
 
   private initialWordsPerPage(geometry: LayoutGeometry): number {

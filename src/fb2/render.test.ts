@@ -42,6 +42,7 @@ describe('FB2 DOM renderer', () => {
     expect(article?.querySelector<HTMLImageElement>('.book-cover img')?.loading).toBe('eager');
     expect(article?.querySelectorAll('p[data-reader-anchor]')).toHaveLength(6);
     expect(footnote?.getAttribute('href')).toBe('#note-1');
+    expect(footnote?.tabIndex).toBe(-1);
     expect(footnote?.dataset.noteText).toBe('Текст сноски.');
     expect(article?.querySelector('#note-1')?.textContent).toContain('Текст сноски');
     expect(rendered.wordCount).toBeGreaterThan(8);
@@ -53,6 +54,7 @@ describe('FB2 DOM renderer', () => {
       .find((link) => link.textContent === 'опасная ссылка');
 
     expect(unsafeLink?.hasAttribute('href')).toBe(false);
+    expect(unsafeLink?.tabIndex).toBe(-1);
   });
 
   it('splits oversized sections into bounded render chunks', () => {

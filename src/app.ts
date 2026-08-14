@@ -1,12 +1,21 @@
 import { decodeBookFile, decodeBookUrl, type DecodedBookSource } from './fb2/decode';
 import { parseFb2 } from './fb2/parse';
 import { renderFb2 } from './fb2/render';
+import { parseEpubArchive } from './epub/parse';
+import { renderEpub } from './epub/render';
+import {
+  HeaderVisibilityController,
+  isShortTap,
+  type TouchPoint,
+} from './header-visibility';
 import { ReaderPager, type PagerSnapshot, type PageMode } from './reader/pager';
 import { JsonStorage, positionStorage } from './reader/storage';
 import { SettingsPanelController } from './settings-panel';
 import {
   DEFAULT_SETTINGS,
+  normalizePageButtonsMode,
   type FootnoteMode,
+  type PageButtonsMode,
   type ReaderSettings,
   type Theme,
 } from './settings';
@@ -43,6 +52,7 @@ export class ChitalkaApp {
   private backAnchor?: string;
   private isPreparing = true;
   private pointerStartX?: number;
+  private touchStart?: TouchPoint;
   private dragDepth = 0;
   private savePositionTimer?: number;
   private toastTimer?: number;
@@ -71,19 +81,27 @@ export class ChitalkaApp {
   private readonly settingsCloseButton = requiredElement<HTMLButtonElement>('settings-close');
   private readonly themeInputs = requiredInputs('theme');
   private readonly pageModeInputs = requiredInputs('page-mode');
+  private readonly pageButtonInputs = requiredInputs('page-buttons');
   private readonly footnoteModeInputs = requiredInputs('footnote-mode');
   private readonly backButton = requiredElement<HTMLButtonElement>('back-to-text');
   private readonly toast = requiredElement<HTMLElement>('toast');
-  private readonly settingsPanelController = new SettingsPanelController({
-    button: this.settingsButton,
-    panel: this.settingsPanel,
-    backdrop: this.settingsBackdrop,
-    closeButton: this.settingsCloseButton,
-  });
+  private readonly appRoot = requiredElement<HTMLElement>('app');
+  private readonly header = requiredElement<HTMLElement>('app-header');
+  private readonly headerVisibility = new HeaderVisibilityController(this.appRoot, this.header);
+  private readonly settingsPanelController = new SettingsPanelController(
+    {
+      button: this.settingsButton,
+      panel: this.settingsPanel,
+      backdrop: this.settingsBackdrop,
+      closeButton: this.settingsCloseButton,
+    },
+    (isOpen) => this.headerVisibility.setPinned(isOpen),
+  );
 
   async start(): Promise<void> {
     this.applySettings();
     this.bindEvents();
+    this.headerVisibility.reveal();
 
     try {
       await this.loadDecoded(await decodeBookUrl(demoBookUrl));
@@ -102,6 +120,7 @@ export class ChitalkaApp {
         ? Math.min(28, Math.max(14, value.fontSize))
         : DEFAULT_SETTINGS.fontSize,
       pageMode: pageModes.includes(value.pageMode) ? value.pageMode : DEFAULT_SETTINGS.pageMode,
+      pageButtons: normalizePageButtonsMode(value.pageButtons),
       footnoteMode: footnoteModes.includes(value.footnoteMode)
         ? value.footnoteMode
         : DEFAULT_SETTINGS.footnoteMode,
@@ -116,12 +135,13 @@ export class ChitalkaApp {
     this.pager.setFontSize(this.settings.fontSize);
     this.pager.setPageMode(this.settings.pageMode);
     document.documentElement.dataset.theme = this.settings.theme;
+    document.documentElement.dataset.pageButtons = this.settings.pageButtons;
     this.updateSettingsControls();
   }
 
   private bindEvents(): void {
-    this.previousButton.addEventListener('click', () => this.pager.previous());
-    this.nextButton.addEventListener('click', () => this.pager.next());
+    this.previousButton.addEventListener('click', () => this.navigate(() => this.pager.previous()));
+    this.nextButton.addEventListener('click', () => this.navigate(() => this.pager.next()));
     this.fontDownButton.addEventListener('click', () => this.changeFontSize(-2));
     this.fontUpButton.addEventListener('click', () => this.changeFontSize(2));
     for (const input of this.themeInputs) {
@@ -132,6 +152,11 @@ export class ChitalkaApp {
     for (const input of this.pageModeInputs) {
       input.addEventListener('change', () => {
         if (input.checked) this.setPageMode(input.value as PageMode);
+      });
+    }
+    for (const input of this.pageButtonInputs) {
+      input.addEventListener('change', () => {
+        if (input.checked) this.setPageButtons(input.value as PageButtonsMode);
       });
     }
     for (const input of this.footnoteModeInputs) {
@@ -149,6 +174,26 @@ export class ChitalkaApp {
 
     this.content.addEventListener('click', (event) => this.handleBookLink(event));
     document.addEventListener('keydown', (event) => this.handleKeydown(event));
+    document.addEventListener('pointermove', (event) => {
+      if (event.pointerType === 'mouse') this.headerVisibility.reveal();
+    });
+    document.addEventListener('pointerdown', (event) => {
+      if (!event.isPrimary || event.pointerType === 'mouse') return;
+      this.touchStart = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+      };
+    });
+    document.addEventListener('pointerup', (event) => {
+      if (!event.isPrimary || event.pointerType === 'mouse') return;
+      const end = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+      if (isShortTap(this.touchStart, end)) this.headerVisibility.reveal();
+      this.touchStart = undefined;
+    });
+    document.addEventListener('pointercancel', () => {
+      this.touchStart = undefined;
+    });
 
     this.viewport.addEventListener('pointerdown', (event) => {
       if (event.isPrimary) this.pointerStartX = event.clientX;
@@ -158,8 +203,8 @@ export class ChitalkaApp {
       const distance = event.clientX - this.pointerStartX;
       this.pointerStartX = undefined;
       if (Math.abs(distance) < 48) return;
-      if (distance < 0) this.pager.next();
-      else this.pager.previous();
+      if (distance < 0) this.navigate(() => this.pager.next());
+      else this.navigate(() => this.pager.previous());
     });
 
     for (const eventName of ['dragenter', 'dragover']) {
@@ -194,8 +239,9 @@ export class ChitalkaApp {
 
   private async loadDecoded(source: DecodedBookSource): Promise<void> {
     this.setLoading(`Готовим «${source.filename}»…`);
-    const parsed = parseFb2(source.xml);
-    const rendered = renderFb2(parsed);
+    const rendered = source.format === 'epub'
+      ? renderEpub(parseEpubArchive(source.files))
+      : renderFb2(parseFb2(source.xml));
     const bookRoot = rendered.fragment.querySelector<HTMLElement>('.book');
     bookRoot?.setAttribute('data-footnotes', this.settings.footnoteMode);
 
@@ -216,6 +262,7 @@ export class ChitalkaApp {
     this.reader.classList.remove('is-preparing');
     this.dropZone.setAttribute('aria-busy', 'false');
     this.onPageChanged(this.pager.getSnapshot());
+    this.headerVisibility.reveal();
   }
 
   private setLoading(message: string): void {
@@ -233,6 +280,7 @@ export class ChitalkaApp {
     this.reader.hidden = false;
     this.reader.classList.add('is-preparing');
     this.dropZone.setAttribute('aria-busy', 'true');
+    this.headerVisibility.reveal();
   }
 
   private showError(error: unknown): void {
@@ -245,6 +293,7 @@ export class ChitalkaApp {
     this.status.hidden = false;
     this.reader.classList.add('is-preparing');
     this.dropZone.setAttribute('aria-busy', 'false');
+    this.headerVisibility.reveal();
   }
 
   private onPageChanged(snapshot: PagerSnapshot): void {
@@ -319,6 +368,14 @@ export class ChitalkaApp {
     this.updateSettingsControls();
   }
 
+  private setPageButtons(mode: PageButtonsMode): void {
+    if (mode === this.settings.pageButtons) return;
+    this.settings.pageButtons = mode;
+    document.documentElement.dataset.pageButtons = mode;
+    this.saveSettings();
+    this.updateSettingsControls();
+  }
+
   private setFootnoteMode(mode: FootnoteMode): void {
     if (mode === this.settings.footnoteMode) return;
     this.settings.footnoteMode = mode;
@@ -341,6 +398,9 @@ export class ChitalkaApp {
     this.fontSizeValue.textContent = `${this.settings.fontSize} px`;
     for (const input of this.themeInputs) input.checked = input.value === this.settings.theme;
     for (const input of this.pageModeInputs) input.checked = input.value === this.settings.pageMode;
+    for (const input of this.pageButtonInputs) {
+      input.checked = input.value === this.settings.pageButtons;
+    }
     for (const input of this.footnoteModeInputs) input.checked = input.value === this.settings.footnoteMode;
     this.fontDownButton.disabled = this.settings.fontSize <= 14;
     this.fontUpButton.disabled = this.settings.fontSize >= 28;
@@ -355,11 +415,12 @@ export class ChitalkaApp {
     if (!link || !this.content.contains(link)) return;
     event.preventDefault();
 
-    if (this.settings.footnoteMode === 'inline') return;
+    const footnote = link.classList.contains('footnote-link');
+    if (footnote && this.settings.footnoteMode === 'inline') return;
     const id = decodeURIComponent(link.hash.slice(1));
-    this.backAnchor = this.pager.getSnapshot().anchor;
+    this.backAnchor = footnote ? this.pager.getSnapshot().anchor : undefined;
     if (!this.pager.goToId(id)) return;
-    this.backButton.hidden = !this.backAnchor;
+    this.backButton.hidden = !footnote || !this.backAnchor;
   }
 
   private returnFromFootnote(): void {
@@ -370,6 +431,7 @@ export class ChitalkaApp {
   }
 
   private handleKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Tab') this.headerVisibility.reveal();
     const target = event.target as HTMLElement | null;
     if (!this.settingsPanel.hidden && target && this.settingsPanel.contains(target)) return;
     if (target?.matches('input, textarea, select') || event.altKey || event.ctrlKey) return;
@@ -377,20 +439,20 @@ export class ChitalkaApp {
     switch (event.key) {
       case 'ArrowRight':
       case 'PageDown':
-        this.pager.next();
+        this.navigate(() => this.pager.next());
         event.preventDefault();
         break;
       case 'ArrowLeft':
       case 'PageUp':
-        this.pager.previous();
+        this.navigate(() => this.pager.previous());
         event.preventDefault();
         break;
       case 'Home':
-        this.pager.first();
+        this.navigate(() => this.pager.first());
         event.preventDefault();
         break;
       case 'End':
-        this.pager.last();
+        this.navigate(() => this.pager.last());
         event.preventDefault();
         break;
       case '+':
@@ -404,6 +466,11 @@ export class ChitalkaApp {
         event.preventDefault();
         break;
     }
+  }
+
+  private navigate(action: () => void): void {
+    action();
+    this.headerVisibility.hide();
   }
 
   private showToast(message: string): void {

@@ -1,6 +1,7 @@
 import { unzip } from 'fflate';
 
-export interface DecodedBookSource {
+export interface DecodedFb2Source {
+  format: 'fb2';
   xml: string;
   /** The name selected by the reader. Used as the stable local book key. */
   filename: string;
@@ -8,12 +9,19 @@ export interface DecodedBookSource {
   contentFilename: string;
 }
 
+export interface DecodedEpubSource {
+  format: 'epub';
+  files: Record<string, Uint8Array>;
+  /** The name selected by the reader. Used as the stable local book key. */
+  filename: string;
+}
+
+export type DecodedBookSource = DecodedFb2Source | DecodedEpubSource;
+
 const ZIP_SIGNATURE = [0x50, 0x4b] as const;
 
-function isZip(bytes: Uint8Array, filename: string): boolean {
-  return /\.zip$/iu.test(filename) || (
-    bytes[0] === ZIP_SIGNATURE[0] && bytes[1] === ZIP_SIGNATURE[1]
-  );
+function hasZipSignature(bytes: Uint8Array): boolean {
+  return bytes[0] === ZIP_SIGNATURE[0] && bytes[1] === ZIP_SIGNATURE[1];
 }
 
 function unzipAsync(bytes: Uint8Array): Promise<Record<string, Uint8Array>> {
@@ -64,20 +72,30 @@ export function decodeXml(bytes: Uint8Array): string {
 }
 
 export async function decodeBookBytes(bytes: Uint8Array, filename: string): Promise<DecodedBookSource> {
-  if (!isZip(bytes, filename)) {
-    return { xml: decodeXml(bytes), filename, contentFilename: filename };
+  const epubFilename = /\.epub$/iu.test(filename);
+  if (epubFilename && !hasZipSignature(bytes)) {
+    throw new Error('Некорректный EPUB: файл не является ZIP-архивом');
+  }
+  const zipped = epubFilename || /\.zip$/iu.test(filename) || hasZipSignature(bytes);
+  if (!zipped) {
+    return { format: 'fb2', xml: decodeXml(bytes), filename, contentFilename: filename };
   }
 
   const files = await unzipAsync(bytes);
+  const epubContainer = Object.keys(files)
+    .find((name) => name.replaceAll('\\', '/').toLocaleLowerCase() === 'meta-inf/container.xml');
+  if (epubFilename || epubContainer) {
+    return { format: 'epub', files, filename };
+  }
   const entries = Object.entries(files).filter(([name]) => !name.endsWith('/'));
-  const entry = entries.find(([name]) => /\.fb2$/iu.test(name)) ?? entries[0];
+  const entry = entries.find(([name]) => /\.fb2$/iu.test(name));
 
   if (!entry) {
-    throw new Error('Архив пуст');
+    throw new Error(entries.length ? 'Архив не содержит книгу FB2' : 'Архив пуст');
   }
 
   const [entryName, content] = entry;
-  return { xml: decodeXml(content), filename, contentFilename: entryName };
+  return { format: 'fb2', xml: decodeXml(content), filename, contentFilename: entryName };
 }
 
 export async function decodeBookFile(file: File): Promise<DecodedBookSource> {

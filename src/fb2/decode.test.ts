@@ -12,6 +12,8 @@ describe('FB2 source decoder', () => {
   it('decodes a plain UTF-8 FB2 file', async () => {
     const result = await decodeBookBytes(new TextEncoder().encode(validBook), 'book.fb2');
 
+    expect(result.format).toBe('fb2');
+    if (result.format !== 'fb2') throw new Error('Expected FB2');
     expect(result.filename).toBe('book.fb2');
     expect(result.contentFilename).toBe('book.fb2');
     expect(result.xml).toContain('<book-title>Тест</book-title>');
@@ -25,6 +27,8 @@ describe('FB2 source decoder', () => {
 
     const result = await decodeBookBytes(archive, 'book.fb2.zip');
 
+    expect(result.format).toBe('fb2');
+    if (result.format !== 'fb2') throw new Error('Expected FB2');
     expect(result.filename).toBe('book.fb2.zip');
     expect(result.contentFilename).toBe('library/book.fb2');
     expect(result.xml).toContain('<FictionBook');

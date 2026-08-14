@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "A modern, browser-based FB2 reader",
+  "description": "A modern, browser-based FB2 and EPUB reader",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

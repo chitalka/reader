@@ -13,7 +13,10 @@ export class SettingsPanelController {
     ? window.matchMedia(MOBILE_SETTINGS_QUERY)
     : undefined;
 
-  constructor(private readonly elements: SettingsPanelElements) {
+  constructor(
+    private readonly elements: SettingsPanelElements,
+    private readonly onOpenChange: (isOpen: boolean) => void = () => undefined,
+  ) {
     elements.button.addEventListener('click', this.handleToggle);
     elements.closeButton.addEventListener('click', this.handleClose);
     elements.backdrop.addEventListener('click', this.handleBackdropClick);
@@ -39,6 +42,7 @@ export class SettingsPanelController {
     this.elements.button.setAttribute('aria-expanded', 'true');
     document.body.classList.add('settings-open');
     this.syncMode();
+    this.onOpenChange(true);
     this.elements.closeButton.focus();
   }
 
@@ -49,6 +53,7 @@ export class SettingsPanelController {
     this.elements.backdrop.hidden = true;
     this.elements.button.setAttribute('aria-expanded', 'false');
     document.body.classList.remove('settings-open');
+    this.onOpenChange(false);
     if (restoreFocus) this.elements.button.focus();
   }
 
