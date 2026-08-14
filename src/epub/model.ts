@@ -13,11 +13,19 @@ export interface EpubSpineItem {
   linear: boolean;
 }
 
+export interface EpubTocItem {
+  title: string;
+  path?: string;
+  fragment?: string;
+  children: EpubTocItem[];
+}
+
 export interface ParsedEpub {
   files: ReadonlyMap<string, Uint8Array>;
   packagePath: string;
   metadata: BookMetadata;
   manifest: ReadonlyMap<string, EpubManifestItem>;
   spine: EpubSpineItem[];
+  toc: EpubTocItem[];
   coverPath?: string;
 }

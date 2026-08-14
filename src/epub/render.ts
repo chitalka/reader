@@ -1,5 +1,5 @@
 import { appendBookChunks } from '../book/dom';
-import { normalizedText, type RenderedBook } from '../book/model';
+import { normalizedText, type BookTocItem, type RenderedBook } from '../book/model';
 import { decodeXml } from '../fb2/decode';
 import type { ParsedEpub } from './model';
 import { resolveArchivePath, resolveEpubReference } from './path';
@@ -121,6 +121,13 @@ interface TargetInfo {
   note: boolean;
   source: Element;
   text: string;
+  anchor?: string;
+}
+
+interface PendingTocItem {
+  title: string;
+  target?: TargetInfo;
+  children: PendingTocItem[];
 }
 
 function parseContentDocument(bytes: Uint8Array): Document {
@@ -285,6 +292,46 @@ export function renderEpub(parsed: ParsedEpub): RenderedBook {
     }
   }
 
+  const referenceTarget = (path: string | undefined, fragment: string | undefined) => (
+    path ? targets.get(`${path}#${fragment ?? ''}`) : undefined
+  );
+  const officialToc = (items: ParsedEpub['toc']): PendingTocItem[] => items.flatMap((item) => {
+    const children = officialToc(item.children);
+    const target = referenceTarget(item.path, item.fragment);
+    return target || children.length ? [{ title: item.title, target, children }] : [];
+  });
+  const fallbackToc = (): PendingTocItem[] => {
+    const roots: PendingTocItem[] = [];
+    const stack: Array<{ level: number; children: PendingTocItem[] }> = [
+      { level: 0, children: roots },
+    ];
+
+    for (const chapter of prepared.filter((candidate) => !candidate.notes)) {
+      for (const heading of Array.from(chapter.body.querySelectorAll('h1, h2, h3, h4, h5, h6'))) {
+        const title = normalizedText(heading);
+        if (!title) continue;
+        const level = Number.parseInt(heading.localName.slice(1), 10);
+        let target = targetsBySource.get(heading);
+        if (!target) {
+          target = {
+            id: `epub-heading-${chapter.index}-${targetCounter++}`,
+            note: false,
+            source: heading,
+            text: title,
+          };
+          targetsBySource.set(heading, target);
+        }
+        while (stack.length > 1 && stack.at(-1)!.level >= level) stack.pop();
+        const item: PendingTocItem = { title, target, children: [] };
+        stack.at(-1)!.children.push(item);
+        stack.push({ level, children: item.children });
+      }
+    }
+    return roots;
+  };
+  const mappedOfficialToc = officialToc(parsed.toc);
+  const pendingToc = mappedOfficialToc.length ? mappedOfficialToc : fallbackToc();
+
   const imageCache = new Map<string, string>();
   let anchorCounter = 0;
   let coverRendered = false;
@@ -330,6 +377,8 @@ export function renderEpub(parsed: ParsedEpub): RenderedBook {
     section.id = chapter.rootId;
     section.dataset.epubPath = chapter.path;
     addAnchor(section);
+    const rootTarget = targets.get(`${chapter.path}#`);
+    if (rootTarget) rootTarget.anchor = section.dataset.readerAnchor;
 
     const renderNode = (source: Node): Node | undefined => {
       if (source.nodeType === Node.TEXT_NODE) {
@@ -392,7 +441,8 @@ export function renderEpub(parsed: ParsedEpub): RenderedBook {
       if (['h3', 'h4', 'h5', 'h6'].includes(name)) target.classList.add('book-subtitle');
       if (name === 'blockquote') target.classList.add('book-cite');
       if (hasToken(source, POEM_TOKENS)) target.classList.add('book-poem');
-      if (ANCHORED_ELEMENTS.has(name)) addAnchor(target);
+      if (ANCHORED_ELEMENTS.has(name) || targetInfo) addAnchor(target);
+      if (targetInfo) targetInfo.anchor = target.dataset.readerAnchor;
 
       if (name !== 'br' && name !== 'hr') {
         for (const child of Array.from(source.childNodes)) {
@@ -429,5 +479,10 @@ export function renderEpub(parsed: ParsedEpub): RenderedBook {
   const fragment = document.createDocumentFragment();
   fragment.append(article);
   const wordCount = article.textContent?.match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
-  return { fragment, metadata: parsed.metadata, wordCount };
+  const renderedToc = (items: PendingTocItem[]): BookTocItem[] => items.flatMap((item) => {
+    const children = renderedToc(item.children);
+    const target = item.target?.anchor;
+    return target || children.length ? [{ title: item.title, target, children }] : [];
+  });
+  return { fragment, metadata: parsed.metadata, toc: renderedToc(pendingToc), wordCount };
 }

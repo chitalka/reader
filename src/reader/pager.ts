@@ -60,6 +60,7 @@ export class ReaderPager {
   private navigationChunks: number[] = [];
   private anchorElements = new Map<string, HTMLElement>();
   private anchorChunks = new Map<string, number>();
+  private anchorOrder = new Map<string, number>();
   private idElements = new Map<string, HTMLElement>();
   private idChunks = new Map<string, number>();
   private chunkPageCounts = new Map<number, number>();
@@ -107,6 +108,7 @@ export class ReaderPager {
     this.chunkPageCounts.clear();
     this.anchorElements.clear();
     this.anchorChunks.clear();
+    this.anchorOrder.clear();
     this.idElements.clear();
     this.idChunks.clear();
     this.currentColumn = 0;
@@ -207,21 +209,21 @@ export class ReaderPager {
       && this.currentColumn >= this.lastSpreadStart();
   }
 
-  goToElement(element: HTMLElement): void {
+  goToElement(element: HTMLElement, preserveTarget = false): void {
     const chunkIndex = this.chunkForElement(element);
     if (chunkIndex === undefined || !this.navigationChunks.includes(chunkIndex)) return;
     this.cancelNavigationAnimations();
     this.activeAnchor = element.dataset.readerAnchor;
     if (chunkIndex !== this.currentChunkIndex) this.mountChunk(chunkIndex);
     this.performLayout({ anchor: this.activeAnchor, chunk: chunkIndex });
-    this.captureVisibleAnchor();
+    if (!preserveTarget) this.captureVisibleAnchor();
     this.moveToCurrent(false);
   }
 
-  goToAnchor(anchor: string): boolean {
+  goToAnchor(anchor: string, preserveTarget = false): boolean {
     const element = this.anchorElements.get(anchor);
     if (!element) return false;
-    this.goToElement(element);
+    this.goToElement(element, preserveTarget);
     return true;
   }
 
@@ -237,6 +239,21 @@ export class ReaderPager {
     this.captureVisibleAnchor();
     this.moveToCurrent(false);
     return true;
+  }
+
+  closestPrecedingAnchor(candidates: readonly string[], anchor?: string): string | undefined {
+    const currentOrder = anchor ? this.anchorOrder.get(anchor) : undefined;
+    if (currentOrder === undefined) return undefined;
+    let active: string | undefined;
+    let activeOrder = -1;
+    for (const candidate of candidates) {
+      const order = this.anchorOrder.get(candidate);
+      if (order !== undefined && order <= currentOrder && order >= activeOrder) {
+        active = candidate;
+        activeOrder = order;
+      }
+    }
+    return active;
   }
 
   getSnapshot(): PagerSnapshot {
@@ -292,6 +309,7 @@ export class ReaderPager {
 
   private indexChunks(): void {
     if (!this.bookRoot) return;
+    let anchorOrder = 0;
     const elements = Array.from(
       this.bookRoot.querySelectorAll<HTMLElement>(':scope > [data-reader-chunk]'),
     );
@@ -303,6 +321,7 @@ export class ReaderPager {
         if (id === undefined) continue;
         this.anchorElements.set(id, anchor);
         this.anchorChunks.set(id, chunkIndex);
+        this.anchorOrder.set(id, anchorOrder++);
       }
       for (const candidate of descendants) {
         if (!candidate.id) continue;

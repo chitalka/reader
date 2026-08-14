@@ -81,4 +81,21 @@ describe('FB2 DOM renderer', () => {
       .toBe(true);
     expect(rendered.fragment.querySelectorAll('[data-reader-anchor]')).toHaveLength(206);
   });
+
+  it('connects hierarchical table-of-contents entries to reader anchors', () => {
+    const rendered = renderFb2(parseFb2(`<?xml version="1.0"?>
+      <FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
+        <description><title-info><book-title>Книга</book-title></title-info></description>
+        <body><section><title><p>Часть</p></title>
+          <section><title><p>Глава</p></title><p>Текст</p></section>
+        </section></body>
+      </FictionBook>`));
+    const part = rendered.toc[0];
+    const chapter = part?.children[0];
+
+    expect(part?.title).toBe('Часть');
+    expect(chapter?.title).toBe('Глава');
+    expect(rendered.fragment.querySelector(`[data-reader-anchor="${part?.target}"]`)).not.toBeNull();
+    expect(rendered.fragment.querySelector(`[data-reader-anchor="${chapter?.target}"]`)).not.toBeNull();
+  });
 });

@@ -31,6 +31,7 @@ function epub3Files(): Record<string, Uint8Array> {
           <item id="chapter-1" href="Text/chapter1.xhtml" media-type="application/xhtml+xml" />
           <item id="chapter-2" href="Text/chapter2.xhtml" media-type="application/xhtml+xml" />
           <item id="notes" href="Text/notes.xhtml" media-type="application/xhtml+xml" />
+          <item id="navigation" href="navigation.xhtml" media-type="application/xhtml+xml" properties="nav" />
           <item id="cover" href="Images/cover.png" media-type="image/png" properties="cover-image" />
           <item id="diagram" href="Images/diagram.svg" media-type="image/svg+xml" />
         </manifest>
@@ -40,6 +41,15 @@ function epub3Files(): Record<string, Uint8Array> {
           <itemref idref="notes" />
         </spine>
       </package>`),
+    'OEBPS/navigation.xhtml': xml(`<?xml version="1.0"?>
+      <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+        <body><nav epub:type="toc"><ol>
+          <li><a href="Text/chapter1.xhtml">Часть первая</a><ol>
+            <li><a href="Text/chapter1.xhtml">Первая глава</a></li>
+            <li><a href="Text/chapter2.xhtml#destination">Вторая глава</a></li>
+          </ol></li>
+        </ol></nav></body>
+      </html>`),
     'OEBPS/Text/chapter1.xhtml': xml(`<?xml version="1.0"?>
       <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
         <head>
@@ -116,6 +126,25 @@ describe('EPUB support', () => {
       'OEBPS/Text/notes.xhtml',
     ]);
     expect(parsed.coverPath).toBe('OEBPS/Images/cover.png');
+    expect(parsed.toc).toEqual([{
+      title: 'Часть первая',
+      path: 'OEBPS/Text/chapter1.xhtml',
+      fragment: '',
+      children: [
+        {
+          title: 'Первая глава',
+          path: 'OEBPS/Text/chapter1.xhtml',
+          fragment: '',
+          children: [],
+        },
+        {
+          title: 'Вторая глава',
+          path: 'OEBPS/Text/chapter2.xhtml',
+          fragment: 'destination',
+          children: [],
+        },
+      ],
+    }]);
   });
 
   it('renders images, cross-document links and footnotes without active content', () => {
@@ -161,6 +190,11 @@ describe('EPUB support', () => {
     expect(book?.querySelector(sameDocumentLink?.getAttribute('href') ?? 'missing')?.textContent)
       .toContain('Цель в этой же главе');
     expect(rendered.wordCount).toBeGreaterThan(10);
+    expect(rendered.toc[0]?.children.map((item) => item.title))
+      .toEqual(['Первая глава', 'Вторая глава']);
+    expect(rendered.toc[0]?.children.every((item) => (
+      Boolean(item.target && book?.querySelector(`[data-reader-anchor="${item.target}"]`))
+    ))).toBe(true);
   });
 
   it('reads an EPUB 2 package with an NCX manifest item', () => {
@@ -177,13 +211,48 @@ describe('EPUB support', () => {
         </manifest>
         <spine toc="ncx"><itemref idref="chapter" /></spine>
       </package>`, {
-      'OPS/toc.ncx': xml('<?xml version="1.0"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" />'),
+      'OPS/chapter.xhtml': xml(`<?xml version="1.0"?>
+        <html xmlns="http://www.w3.org/1999/xhtml"><body>
+          <h1 id="chapter-1">Глава I</h1><p>Текст</p>
+        </body></html>`),
+      'OPS/toc.ncx': xml(`<?xml version="1.0"?>
+        <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/"><navMap>
+          <navPoint><navLabel><text>Часть первая</text></navLabel><content src="chapter.xhtml" />
+            <navPoint><navLabel><text>Глава I</text></navLabel><content src="chapter.xhtml#chapter-1" /></navPoint>
+          </navPoint>
+        </navMap></ncx>`),
     });
     const parsed = parseEpubArchive(files);
 
     expect(parsed.metadata.title).toBe('EPUB второй версии');
     expect(parsed.spine).toHaveLength(1);
-    expect(renderEpub(parsed).fragment.textContent).toContain('Текст');
+    expect(parsed.toc[0]?.children[0]).toMatchObject({
+      title: 'Глава I',
+      path: 'OPS/chapter.xhtml',
+      fragment: 'chapter-1',
+    });
+    const rendered = renderEpub(parsed);
+    expect(rendered.fragment.textContent).toContain('Текст');
+    expect(rendered.toc[0]?.children[0]?.target).toBeTruthy();
+  });
+
+  it('falls back to a hierarchy of spine document headings', () => {
+    const files = minimalArchive(`<?xml version="1.0"?>
+      <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+        <metadata /><manifest>
+          <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml" />
+        </manifest><spine><itemref idref="chapter" /></spine>
+      </package>`, {
+      'OPS/chapter.xhtml': xml(`<?xml version="1.0"?>
+        <html xmlns="http://www.w3.org/1999/xhtml"><body>
+          <h1>Часть</h1><h2>Глава</h2><p>Текст</p>
+        </body></html>`),
+    });
+    const rendered = renderEpub(parseEpubArchive(files));
+
+    expect(rendered.toc[0]?.title).toBe('Часть');
+    expect(rendered.toc[0]?.children[0]?.title).toBe('Глава');
+    expect(rendered.toc[0]?.children[0]?.target).toBeTruthy();
   });
 
   it('rejects fixed-layout EPUB publications', () => {

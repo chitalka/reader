@@ -1,16 +1,17 @@
 import { decodeBookFile, decodeBookUrl, type DecodedBookSource } from './fb2/decode';
+import type { BookTocItem } from './book/model';
 import { parseFb2 } from './fb2/parse';
 import { renderFb2 } from './fb2/render';
 import { parseEpubArchive } from './epub/parse';
 import { renderEpub } from './epub/render';
 import {
   HeaderVisibilityController,
-  isShortTap,
-  type TouchPoint,
+  bindTouchTap,
 } from './header-visibility';
 import { ReaderPager, type PagerSnapshot, type PageMode } from './reader/pager';
 import { JsonStorage, positionStorage } from './reader/storage';
 import { SettingsPanelController } from './settings-panel';
+import { TocPanelController } from './toc-panel';
 import {
   DEFAULT_SETTINGS,
   normalizePageButtonsMode,
@@ -34,6 +35,13 @@ function requiredInputs(name: string): HTMLInputElement[] {
   return inputs;
 }
 
+function tocTargets(items: BookTocItem[]): string[] {
+  return items.flatMap((item) => [
+    ...(item.target ? [item.target] : []),
+    ...tocTargets(item.children),
+  ]);
+}
+
 export class ChitalkaApp {
   private readonly settingsStorage = new JsonStorage<ReaderSettings>(
     'chitalka:settings:v1',
@@ -49,10 +57,10 @@ export class ChitalkaApp {
   );
   private currentBookFilename?: string;
   private currentWordCount = 0;
+  private currentTocTargets: string[] = [];
   private backAnchor?: string;
   private isPreparing = true;
   private pointerStartX?: number;
-  private touchStart?: TouchPoint;
   private dragDepth = 0;
   private savePositionTimer?: number;
   private toastTimer?: number;
@@ -79,6 +87,11 @@ export class ChitalkaApp {
   private readonly settingsPanel = requiredElement<HTMLElement>('settings-panel');
   private readonly settingsBackdrop = requiredElement<HTMLElement>('settings-backdrop');
   private readonly settingsCloseButton = requiredElement<HTMLButtonElement>('settings-close');
+  private readonly tocButton = requiredElement<HTMLButtonElement>('toc-button');
+  private readonly tocPanel = requiredElement<HTMLElement>('toc-panel');
+  private readonly tocBackdrop = requiredElement<HTMLElement>('toc-backdrop');
+  private readonly tocCloseButton = requiredElement<HTMLButtonElement>('toc-close');
+  private readonly tocList = requiredElement<HTMLElement>('toc-list-root');
   private readonly themeInputs = requiredInputs('theme');
   private readonly pageModeInputs = requiredInputs('page-mode');
   private readonly pageButtonInputs = requiredInputs('page-buttons');
@@ -88,15 +101,31 @@ export class ChitalkaApp {
   private readonly appRoot = requiredElement<HTMLElement>('app');
   private readonly header = requiredElement<HTMLElement>('app-header');
   private readonly headerVisibility = new HeaderVisibilityController(this.appRoot, this.header);
-  private readonly settingsPanelController = new SettingsPanelController(
-    {
-      button: this.settingsButton,
-      panel: this.settingsPanel,
-      backdrop: this.settingsBackdrop,
-      closeButton: this.settingsCloseButton,
-    },
-    (isOpen) => this.headerVisibility.setPinned(isOpen),
-  );
+  private readonly settingsPanelController: SettingsPanelController;
+  private readonly tocPanelController: TocPanelController;
+
+  constructor() {
+    this.settingsPanelController = new SettingsPanelController(
+      {
+        button: this.settingsButton,
+        panel: this.settingsPanel,
+        backdrop: this.settingsBackdrop,
+        closeButton: this.settingsCloseButton,
+      },
+      (isOpen) => this.handleSettingsOpenChange(isOpen),
+    );
+    this.tocPanelController = new TocPanelController(
+      {
+        button: this.tocButton,
+        panel: this.tocPanel,
+        backdrop: this.tocBackdrop,
+        closeButton: this.tocCloseButton,
+        list: this.tocList,
+      },
+      (target) => this.goToTocTarget(target),
+      (isOpen) => this.handleTocOpenChange(isOpen),
+    );
+  }
 
   async start(): Promise<void> {
     this.applySettings();
@@ -177,34 +206,23 @@ export class ChitalkaApp {
     document.addEventListener('pointermove', (event) => {
       if (event.pointerType === 'mouse') this.headerVisibility.reveal();
     });
-    document.addEventListener('pointerdown', (event) => {
-      if (!event.isPrimary || event.pointerType === 'mouse') return;
-      this.touchStart = {
-        pointerId: event.pointerId,
-        x: event.clientX,
-        y: event.clientY,
-      };
-    });
-    document.addEventListener('pointerup', (event) => {
-      if (!event.isPrimary || event.pointerType === 'mouse') return;
-      const end = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-      if (isShortTap(this.touchStart, end)) this.headerVisibility.reveal();
-      this.touchStart = undefined;
-    });
-    document.addEventListener('pointercancel', () => {
-      this.touchStart = undefined;
-    });
+    bindTouchTap(this.viewport, () => this.headerVisibility.toggle());
 
     this.viewport.addEventListener('pointerdown', (event) => {
-      if (event.isPrimary) this.pointerStartX = event.clientX;
+      if (!event.isPrimary) return;
+      this.pointerStartX = event.clientX;
     });
     this.viewport.addEventListener('pointerup', (event) => {
-      if (this.pointerStartX === undefined || !event.isPrimary) return;
+      if (!event.isPrimary) return;
+      if (this.pointerStartX === undefined) return;
       const distance = event.clientX - this.pointerStartX;
       this.pointerStartX = undefined;
       if (Math.abs(distance) < 48) return;
       if (distance < 0) this.navigate(() => this.pager.next());
       else this.navigate(() => this.pager.previous());
+    });
+    this.viewport.addEventListener('pointercancel', () => {
+      this.pointerStartX = undefined;
     });
 
     for (const eventName of ['dragenter', 'dragover']) {
@@ -247,6 +265,8 @@ export class ChitalkaApp {
 
     this.currentBookFilename = source.filename;
     this.currentWordCount = rendered.wordCount;
+    this.currentTocTargets = tocTargets(rendered.toc);
+    this.tocPanelController.setItems(rendered.toc);
     this.backAnchor = undefined;
     this.backButton.hidden = true;
     this.title.textContent = rendered.metadata.title;
@@ -267,8 +287,10 @@ export class ChitalkaApp {
 
   private setLoading(message: string): void {
     this.settingsPanelController.close(false);
+    this.tocPanelController.setItems([]);
     this.isPreparing = true;
     this.currentBookFilename = undefined;
+    this.currentTocTargets = [];
     this.setPaginationPending(true);
     if (this.savePositionTimer) {
       window.clearTimeout(this.savePositionTimer);
@@ -299,6 +321,9 @@ export class ChitalkaApp {
   private onPageChanged(snapshot: PagerSnapshot): void {
     this.previousButton.disabled = this.pager.isFirst();
     this.nextButton.disabled = this.pager.isLast();
+    this.tocPanelController.setActive(
+      this.pager.closestPrecedingAnchor(this.currentTocTargets, snapshot.anchor),
+    );
 
     if (snapshot.paginationExact) {
       const lastPage = Math.min(
@@ -434,6 +459,7 @@ export class ChitalkaApp {
     if (event.key === 'Tab') this.headerVisibility.reveal();
     const target = event.target as HTMLElement | null;
     if (!this.settingsPanel.hidden && target && this.settingsPanel.contains(target)) return;
+    if (!this.tocPanel.hidden && target && this.tocPanel.contains(target)) return;
     if (target?.matches('input, textarea, select') || event.altKey || event.ctrlKey) return;
 
     switch (event.key) {
@@ -471,6 +497,28 @@ export class ChitalkaApp {
   private navigate(action: () => void): void {
     action();
     this.headerVisibility.hide();
+  }
+
+  private goToTocTarget(target: string): void {
+    this.backAnchor = undefined;
+    this.backButton.hidden = true;
+    this.pager.goToAnchor(target, true);
+  }
+
+  private handleSettingsOpenChange(isOpen: boolean): void {
+    if (isOpen) this.tocPanelController.close(false);
+    this.syncHeaderPin();
+  }
+
+  private handleTocOpenChange(isOpen: boolean): void {
+    if (isOpen) this.settingsPanelController.close(false);
+    this.syncHeaderPin();
+  }
+
+  private syncHeaderPin(): void {
+    this.headerVisibility.setPinned(
+      this.settingsPanelController.opened || this.tocPanelController.opened,
+    );
   }
 
   private showToast(message: string): void {

@@ -12,6 +12,38 @@ export function isShortTap(start: TouchPoint | undefined, end: TouchPoint): bool
   return Math.hypot(end.x - start.x, end.y - start.y) <= TAP_DISTANCE;
 }
 
+export function bindTouchTap(target: HTMLElement, onTap: () => void): () => void {
+  let start: TouchPoint | undefined;
+
+  const handlePointerDown = (event: PointerEvent) => {
+    if (!event.isPrimary || event.pointerType === 'mouse') return;
+    start = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+  };
+  const handlePointerUp = (event: PointerEvent) => {
+    if (!event.isPrimary || event.pointerType === 'mouse') return;
+    const end = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    if (isShortTap(start, end)) onTap();
+    start = undefined;
+  };
+  const handlePointerCancel = () => {
+    start = undefined;
+  };
+
+  target.addEventListener('pointerdown', handlePointerDown);
+  target.addEventListener('pointerup', handlePointerUp);
+  target.addEventListener('pointercancel', handlePointerCancel);
+
+  return () => {
+    target.removeEventListener('pointerdown', handlePointerDown);
+    target.removeEventListener('pointerup', handlePointerUp);
+    target.removeEventListener('pointercancel', handlePointerCancel);
+  };
+}
+
 export class HeaderVisibilityController {
   private hideTimer?: number;
   private pinned = false;
@@ -31,6 +63,14 @@ export class HeaderVisibilityController {
     if (this.pinned) return;
     this.clearTimer();
     this.setHidden(true);
+  }
+
+  toggle(): void {
+    if (this.root.dataset.headerVisibility === 'hidden') {
+      this.reveal();
+    } else {
+      this.hide();
+    }
   }
 
   setPinned(pinned: boolean): void {

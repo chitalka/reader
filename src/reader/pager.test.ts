@@ -204,6 +204,39 @@ describe('ReaderPager', () => {
     expect(pager.getSnapshot().anchor).toBe('saved');
   });
 
+  it('finds the nearest table-of-contents anchor before the reading position', async () => {
+    const fragment = document.createDocumentFragment();
+    fragment.append(
+      anchor('part', 0, 40),
+      anchor('chapter-1', 0, 80),
+      anchor('reading-place', 2, 80),
+      anchor('chapter-2', 3, 80),
+    );
+    await pager.setBook(fragment, { anchor: 'reading-place' });
+
+    expect(pager.closestPrecedingAnchor(
+      ['part', 'chapter-1', 'chapter-2'],
+      pager.getSnapshot().anchor,
+    )).toBe('chapter-1');
+  });
+
+  it('keeps a selected table-of-contents target until the next page turn', async () => {
+    const fragment = document.createDocumentFragment();
+    fragment.append(
+      anchor('previous-chapter', 2, 80),
+      anchor('selected-chapter', 3, 80),
+    );
+    await pager.setBook(fragment);
+
+    expect(pager.goToAnchor('selected-chapter', true)).toBe(true);
+
+    expect(pager.getSnapshot()).toMatchObject({
+      currentPage: 3,
+      anchor: 'selected-chapter',
+      anchorVisible: true,
+    });
+  });
+
   it('uses the saved column when the anchor no longer exists', async () => {
     await pager.setBook(document.createDocumentFragment(), {
       anchor: 'removed',

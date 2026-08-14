@@ -5,9 +5,16 @@ export { normalizedText, type BookMetadata, type RenderedBook } from '../book/mo
 
 import type { BookMetadata } from '../book/model';
 
+export interface Fb2TocItem {
+  title: string;
+  source: Element;
+  children: Fb2TocItem[];
+}
+
 export interface ParsedBook {
   document: XMLDocument;
   metadata: BookMetadata;
+  toc: Fb2TocItem[];
 }
 
 export function elementChildren(parent: Element | XMLDocument): Element[] {

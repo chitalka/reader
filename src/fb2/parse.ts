@@ -4,6 +4,7 @@ import {
   descendantElement,
   normalizedText,
   type BookMetadata,
+  type Fb2TocItem,
   type ParsedBook,
 } from './model';
 
@@ -39,6 +40,20 @@ function metadataFromDocument(document: XMLDocument): BookMetadata {
   };
 }
 
+function tocFromParent(parent: Element): Fb2TocItem[] {
+  return childElements(parent, 'section').flatMap((section) => {
+    const children = tocFromParent(section);
+    const title = normalizedText(childElement(section, 'title'));
+    return title ? [{ title, source: section, children }] : children;
+  });
+}
+
+function tocFromDocument(document: XMLDocument): Fb2TocItem[] {
+  return Array.from(document.getElementsByTagNameNS('*', 'body'))
+    .filter((body) => body.getAttribute('name')?.toLocaleLowerCase() !== 'notes')
+    .flatMap(tocFromParent);
+}
+
 export function parseFb2(xml: string): ParsedBook {
   const document = new DOMParser().parseFromString(xml, 'application/xml');
   const parserError = document.querySelector('parsererror');
@@ -54,5 +69,6 @@ export function parseFb2(xml: string): ParsedBook {
   return {
     document,
     metadata: metadataFromDocument(document),
+    toc: tocFromDocument(document),
   };
 }

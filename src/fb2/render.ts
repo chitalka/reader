@@ -3,9 +3,11 @@ import {
   childElement,
   descendantElement,
   normalizedText,
+  type Fb2TocItem,
   type ParsedBook,
   type RenderedBook,
 } from './model';
+import type { BookTocItem } from '../book/model';
 import { appendBookChunks } from '../book/dom';
 
 interface BinaryAsset {
@@ -37,6 +39,7 @@ export function renderFb2(parsed: ParsedBook): RenderedBook {
   const htmlDocument = document;
   const binaryAssets = new Map<string, BinaryAsset>();
   const noteText = new Map<string, string>();
+  const sectionAnchors = new WeakMap<Element, string>();
   let anchorCounter = 0;
 
   for (const binary of Array.from(parsed.document.getElementsByTagNameNS('*', 'binary'))) {
@@ -119,6 +122,8 @@ export function renderFb2(parsed: ParsedBook): RenderedBook {
         const id = source.getAttribute('id');
         if (id) target.id = id;
         addAnchor(target);
+        const anchor = target.dataset.readerAnchor;
+        if (anchor !== undefined) sectionAnchors.set(source, anchor);
         appendChildren(source, target, depth + 1);
         return target;
       }
@@ -282,10 +287,16 @@ export function renderFb2(parsed: ParsedBook): RenderedBook {
   const fragment = htmlDocument.createDocumentFragment();
   fragment.append(article);
   const wordCount = article.textContent?.match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
+  const renderToc = (items: Fb2TocItem[]): BookTocItem[] => items.flatMap((item) => {
+    const children = renderToc(item.children);
+    const target = sectionAnchors.get(item.source);
+    return target || children.length ? [{ title: item.title, target, children }] : [];
+  });
 
   return {
     fragment,
     metadata: parsed.metadata,
+    toc: renderToc(parsed.toc),
     wordCount,
   };
 }

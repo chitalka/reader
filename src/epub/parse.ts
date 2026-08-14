@@ -1,7 +1,7 @@
 import { normalizedText } from '../book/model';
 import { decodeXml } from '../fb2/decode';
-import type { EpubManifestItem, EpubSpineItem, ParsedEpub } from './model';
-import { resolveArchivePath } from './path';
+import type { EpubManifestItem, EpubSpineItem, EpubTocItem, ParsedEpub } from './model';
+import { resolveArchivePath, resolveEpubReference } from './path';
 
 const PACKAGE_MEDIA_TYPE = 'application/oebps-package+xml';
 const CONTENT_MEDIA_TYPES = new Set(['application/xhtml+xml', 'text/html']);
@@ -54,6 +54,99 @@ function metadataFromPackage(packageDocument: XMLDocument) {
 
 function propertyTokens(element: Element): string[] {
   return (element.getAttribute('properties') ?? '').split(/\s+/u).filter(Boolean);
+}
+
+function directChildren(parent: Element, localName: string): Element[] {
+  return Array.from(parent.children).filter((child) => child.localName === localName);
+}
+
+function epubTypeTokens(element: Element): string[] {
+  const attribute = Array.from(element.attributes).find((candidate) => (
+    candidate.name === 'epub:type'
+    || candidate.localName === 'type' && candidate.namespaceURI?.includes('idpf.org/2007/ops')
+  ));
+  return (attribute?.value ?? '').split(/\s+/u).map((token) => token.toLocaleLowerCase());
+}
+
+function resolvedTocItem(
+  title: string,
+  basePath: string,
+  href: string | null,
+  children: EpubTocItem[],
+): EpubTocItem | undefined {
+  const reference = href ? resolveEpubReference(basePath, href) : undefined;
+  if (!title) return undefined;
+  return {
+    title,
+    path: reference?.path,
+    fragment: reference?.fragment,
+    children,
+  };
+}
+
+function navigationToc(
+  files: ReadonlyMap<string, Uint8Array>,
+  manifest: ReadonlyMap<string, EpubManifestItem>,
+): EpubTocItem[] {
+  const navigationItem = Array.from(manifest.values())
+    .find((item) => item.properties.includes('nav'));
+  const bytes = navigationItem && files.get(navigationItem.path);
+  if (!navigationItem || !bytes) return [];
+
+  const navigation = parseXml(bytes, navigationItem.path);
+  const tocNav = elementsByName(navigation, 'nav')
+    .find((nav) => epubTypeTokens(nav).includes('toc'));
+  const rootList = tocNav && directChildren(tocNav, 'ol')[0];
+  if (!rootList) return [];
+
+  const parseList = (list: Element): EpubTocItem[] => directChildren(list, 'li').flatMap((item) => {
+    const label = Array.from(item.children)
+      .find((child) => child.localName === 'a' || child.localName === 'span');
+    const childList = directChildren(item, 'ol')[0];
+    const children = childList ? parseList(childList) : [];
+    const parsed = label && resolvedTocItem(
+      normalizedText(label),
+      navigationItem.path,
+      label.localName === 'a' ? label.getAttribute('href') : null,
+      children,
+    );
+    return parsed ? [parsed] : children;
+  });
+
+  return parseList(rootList);
+}
+
+function ncxToc(
+  files: ReadonlyMap<string, Uint8Array>,
+  manifest: ReadonlyMap<string, EpubManifestItem>,
+  spineElement: Element | undefined,
+): EpubTocItem[] {
+  const tocId = spineElement?.getAttribute('toc') ?? '';
+  const ncxItem = manifest.get(tocId) ?? Array.from(manifest.values())
+    .find((item) => item.mediaType === 'application/x-dtbncx+xml');
+  const bytes = ncxItem && files.get(ncxItem.path);
+  if (!ncxItem || !bytes) return [];
+
+  const ncx = parseXml(bytes, ncxItem.path);
+  const navMap = elementsByName(ncx, 'navMap')[0];
+  if (!navMap) return [];
+
+  const parsePoints = (parent: Element): EpubTocItem[] => directChildren(parent, 'navPoint')
+    .flatMap((point) => {
+      const label = directChildren(point, 'navLabel')[0];
+      const text = label && elementsByName(label, 'text')[0];
+      const content = directChildren(point, 'content')[0];
+      const children = parsePoints(point);
+      const parsed = resolvedTocItem(
+        normalizedText(text),
+        ncxItem.path,
+        content?.getAttribute('src') ?? null,
+        children,
+      );
+      return parsed ? [parsed] : children;
+    });
+
+  return parsePoints(navMap);
 }
 
 function isFixedLayout(packageDocument: XMLDocument): boolean {
@@ -191,12 +284,16 @@ export function parseEpubArchive(archive: Record<string, Uint8Array>): ParsedEpu
     throw new Error('Некорректный EPUB: порядок чтения spine пуст');
   }
 
+  const navigation = navigationToc(files, manifest);
+  const toc = navigation.length ? navigation : ncxToc(files, manifest, spineElement);
+
   return {
     files,
     packagePath,
     metadata: metadataFromPackage(packageDocument),
     manifest,
     spine,
+    toc,
     coverPath: coverPath(packageDocument, manifest),
   };
 }

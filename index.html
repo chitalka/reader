@@ -25,6 +25,21 @@
 
         <div class="header-actions">
           <button
+            id="toc-button"
+            class="icon-button"
+            type="button"
+            aria-label="Оглавление"
+            aria-haspopup="dialog"
+            aria-controls="toc-panel"
+            aria-expanded="false"
+            hidden
+          >
+            <svg class="toc-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 6h11M9 12h11M9 18h11" />
+              <path d="M4 6h.01M4 12h.01M4 18h.01" />
+            </svg>
+          </button>
+          <button
             id="settings-button"
             class="icon-button"
             type="button"
@@ -50,6 +65,23 @@
           />
         </div>
       </header>
+
+      <div id="toc-backdrop" class="panel-backdrop toc-backdrop" hidden></div>
+      <section
+        id="toc-panel"
+        class="toc-panel"
+        role="dialog"
+        aria-labelledby="toc-title"
+        hidden
+      >
+        <div class="toc-panel-header">
+          <h2 id="toc-title">Оглавление</h2>
+          <button id="toc-close" class="panel-close" type="button" aria-label="Закрыть оглавление">
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+        <nav id="toc-list-root" class="toc-navigation" aria-label="Разделы книги"></nav>
+      </section>
 
       <div id="settings-backdrop" class="settings-backdrop" hidden></div>
       <section
