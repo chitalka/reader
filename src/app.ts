@@ -11,7 +11,7 @@ import {
   type Theme,
 } from './settings';
 
-const demoBookUrl = new URL('../build/index/i/Anna-Karenina.fb2.zip', import.meta.url);
+const demoBookUrl = new URL('../books/Anna-Karenina.fb2', import.meta.url);
 
 function requiredElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
