@@ -230,9 +230,12 @@ button:disabled {
   font-size: 19px;
 }
 
-.icon-button:hover,
 .icon-button:active,
 .icon-button[aria-expanded="true"] {
+  background: var(--accent-soft);
+}
+
+.icon-button:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
 }

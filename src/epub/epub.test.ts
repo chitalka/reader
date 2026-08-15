@@ -173,7 +173,7 @@ describe('EPUB support', () => {
     expect(book?.textContent).not.toContain('globalThis.evil');
     expect(unsafeLink?.hasAttribute('href')).toBe(false);
 
-    expect(footnote?.dataset.noteText).toContain('Текст межглавной сноски');
+    expect(footnote?.dataset.noteText).toBe('1. Текст межглавной сноски.');
     expect(footnote?.getAttribute('href')).toMatch(/^#epub-target-/u);
     expect(footnote?.tabIndex).toBe(-1);
     const noteHash = footnote?.hash;

@@ -6,6 +6,8 @@ import { parseEpubArchive } from './epub/parse';
 import { renderEpub } from './epub/render';
 import {
   HeaderVisibilityController,
+  bindMouseReadingClick,
+  bindTouchSwipe,
   bindTouchTap,
 } from './header-visibility';
 import { ReaderPager, type PagerSnapshot, type PageMode } from './reader/pager';
@@ -60,7 +62,6 @@ export class ChitalkaApp {
   private currentTocTargets: string[] = [];
   private backAnchor?: string;
   private isPreparing = true;
-  private pointerStartX?: number;
   private dragDepth = 0;
   private savePositionTimer?: number;
   private toastTimer?: number;
@@ -169,7 +170,7 @@ export class ChitalkaApp {
   }
 
   private bindEvents(): void {
-    this.previousButton.addEventListener('click', () => this.navigate(() => this.pager.previous()));
+    this.previousButton.addEventListener('click', () => this.navigateBackward());
     this.nextButton.addEventListener('click', () => this.navigate(() => this.pager.next()));
     this.fontDownButton.addEventListener('click', () => this.changeFontSize(-2));
     this.fontUpButton.addEventListener('click', () => this.changeFontSize(2));
@@ -203,26 +204,11 @@ export class ChitalkaApp {
 
     this.content.addEventListener('click', (event) => this.handleBookLink(event));
     document.addEventListener('keydown', (event) => this.handleKeydown(event));
-    document.addEventListener('pointermove', (event) => {
-      if (event.pointerType === 'mouse') this.headerVisibility.reveal();
-    });
+    bindMouseReadingClick(this.viewport, () => this.headerVisibility.toggle());
     bindTouchTap(this.viewport, () => this.headerVisibility.toggle());
-
-    this.viewport.addEventListener('pointerdown', (event) => {
-      if (!event.isPrimary) return;
-      this.pointerStartX = event.clientX;
-    });
-    this.viewport.addEventListener('pointerup', (event) => {
-      if (!event.isPrimary) return;
-      if (this.pointerStartX === undefined) return;
-      const distance = event.clientX - this.pointerStartX;
-      this.pointerStartX = undefined;
-      if (Math.abs(distance) < 48) return;
+    bindTouchSwipe(this.viewport, (distance) => {
       if (distance < 0) this.navigate(() => this.pager.next());
-      else this.navigate(() => this.pager.previous());
-    });
-    this.viewport.addEventListener('pointercancel', () => {
-      this.pointerStartX = undefined;
+      else this.navigateBackward();
     });
 
     for (const eventName of ['dragenter', 'dragover']) {
@@ -404,6 +390,7 @@ export class ChitalkaApp {
   private setFootnoteMode(mode: FootnoteMode): void {
     if (mode === this.settings.footnoteMode) return;
     this.settings.footnoteMode = mode;
+    if (mode === 'inline') this.clearFootnoteReturn();
     this.content.querySelector<HTMLElement>('.book')
       ?.setAttribute('data-footnotes', this.settings.footnoteMode);
     this.saveSettings();
@@ -443,16 +430,18 @@ export class ChitalkaApp {
     const footnote = link.classList.contains('footnote-link');
     if (footnote && this.settings.footnoteMode === 'inline') return;
     const id = decodeURIComponent(link.hash.slice(1));
-    this.backAnchor = footnote ? this.pager.getSnapshot().anchor : undefined;
+    const returnAnchor = footnote ? this.pager.getSnapshot().anchor : undefined;
     if (!this.pager.goToId(id)) return;
+    this.backAnchor = returnAnchor;
     this.backButton.hidden = !footnote || !this.backAnchor;
   }
 
-  private returnFromFootnote(): void {
-    if (!this.backAnchor) return;
-    this.pager.goToAnchor(this.backAnchor);
-    this.backAnchor = undefined;
-    this.backButton.hidden = true;
+  private returnFromFootnote(): boolean {
+    if (!this.backAnchor) return false;
+    const returned = this.pager.goToAnchor(this.backAnchor);
+    if (!returned) return false;
+    this.clearFootnoteReturn();
+    return true;
   }
 
   private handleKeydown(event: KeyboardEvent): void {
@@ -470,14 +459,16 @@ export class ChitalkaApp {
         break;
       case 'ArrowLeft':
       case 'PageUp':
-        this.navigate(() => this.pager.previous());
+        this.navigateBackward();
         event.preventDefault();
         break;
       case 'Home':
+        this.clearFootnoteReturn();
         this.navigate(() => this.pager.first());
         event.preventDefault();
         break;
       case 'End':
+        this.clearFootnoteReturn();
         this.navigate(() => this.pager.last());
         event.preventDefault();
         break;
@@ -499,10 +490,19 @@ export class ChitalkaApp {
     this.headerVisibility.hide();
   }
 
+  private navigateBackward(): void {
+    if (!this.returnFromFootnote()) this.pager.previous();
+    this.headerVisibility.hide();
+  }
+
   private goToTocTarget(target: string): void {
+    this.clearFootnoteReturn();
+    this.pager.goToAnchor(target, true);
+  }
+
+  private clearFootnoteReturn(): void {
     this.backAnchor = undefined;
     this.backButton.hidden = true;
-    this.pager.goToAnchor(target, true);
   }
 
   private handleSettingsOpenChange(isOpen: boolean): void {

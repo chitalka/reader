@@ -6,6 +6,7 @@ export interface TouchPoint {
 
 const DEFAULT_IDLE_DELAY = 5_000;
 const TAP_DISTANCE = 14;
+const SWIPE_DISTANCE = 48;
 
 export function isShortTap(start: TouchPoint | undefined, end: TouchPoint): boolean {
   if (!start || start.pointerId !== end.pointerId) return false;
@@ -28,6 +29,90 @@ export function bindTouchTap(target: HTMLElement, onTap: () => void): () => void
     const end = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     if (isShortTap(start, end)) onTap();
     start = undefined;
+  };
+  const handlePointerCancel = () => {
+    start = undefined;
+  };
+
+  target.addEventListener('pointerdown', handlePointerDown);
+  target.addEventListener('pointerup', handlePointerUp);
+  target.addEventListener('pointercancel', handlePointerCancel);
+
+  return () => {
+    target.removeEventListener('pointerdown', handlePointerDown);
+    target.removeEventListener('pointerup', handlePointerUp);
+    target.removeEventListener('pointercancel', handlePointerCancel);
+  };
+}
+
+function hasTextSelection(document: Document): boolean {
+  const selection = document.getSelection();
+  return Boolean(selection && !selection.isCollapsed && selection.toString().trim());
+}
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element
+    && Boolean(target.closest('a, button, input, textarea, select, label'));
+}
+
+export function bindMouseReadingClick(target: HTMLElement, onClick: () => void): () => void {
+  let start: (TouchPoint & { selectionActive: boolean; interactive: boolean }) | undefined;
+
+  const handlePointerDown = (event: PointerEvent) => {
+    if (!event.isPrimary || event.pointerType !== 'mouse' || event.button !== 0) return;
+    start = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      selectionActive: hasTextSelection(target.ownerDocument),
+      interactive: isInteractiveTarget(event.target),
+    };
+  };
+  const handlePointerUp = (event: PointerEvent) => {
+    if (!event.isPrimary || event.pointerType !== 'mouse') return;
+    const end = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    if (
+      isShortTap(start, end)
+      && !start?.selectionActive
+      && !start?.interactive
+      && !hasTextSelection(target.ownerDocument)
+    ) {
+      onClick();
+    }
+    start = undefined;
+  };
+  const handlePointerCancel = () => {
+    start = undefined;
+  };
+
+  target.addEventListener('pointerdown', handlePointerDown);
+  target.addEventListener('pointerup', handlePointerUp);
+  target.addEventListener('pointercancel', handlePointerCancel);
+
+  return () => {
+    target.removeEventListener('pointerdown', handlePointerDown);
+    target.removeEventListener('pointerup', handlePointerUp);
+    target.removeEventListener('pointercancel', handlePointerCancel);
+  };
+}
+
+export function bindTouchSwipe(target: HTMLElement, onSwipe: (distance: number) => void): () => void {
+  let start: TouchPoint | undefined;
+
+  const handlePointerDown = (event: PointerEvent) => {
+    if (!event.isPrimary || event.pointerType === 'mouse') return;
+    start = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+  };
+  const handlePointerUp = (event: PointerEvent) => {
+    if (!event.isPrimary || event.pointerType === 'mouse') return;
+    if (!start || start.pointerId !== event.pointerId) return;
+    const distance = event.clientX - start.x;
+    start = undefined;
+    if (Math.abs(distance) >= SWIPE_DISTANCE) onSwipe(distance);
   };
   const handlePointerCancel = () => {
     start = undefined;

@@ -9,6 +9,7 @@ import {
 } from './model';
 import type { BookTocItem } from '../book/model';
 import { appendBookChunks } from '../book/dom';
+import { inlineFootnoteText } from '../book/footnotes';
 
 interface BinaryAsset {
   contentType: string;
@@ -170,7 +171,10 @@ export function renderFb2(parsed: ParsedBook): RenderedBook {
           const noteId = href.slice(1);
           target.setAttribute('href', href);
           target.className = 'footnote-link';
-          target.dataset.noteText = noteText.get(noteId) ?? '';
+          target.dataset.noteText = inlineFootnoteText(
+            normalizedText(source),
+            noteText.get(noteId) ?? '',
+          );
         } else {
           const externalUrl = safeExternalUrl(href);
           if (externalUrl) {

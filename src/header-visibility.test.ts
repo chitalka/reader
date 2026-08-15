@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HeaderVisibilityController, bindTouchTap, isShortTap } from './header-visibility';
+import {
+  HeaderVisibilityController,
+  bindMouseReadingClick,
+  bindTouchSwipe,
+  bindTouchTap,
+  isShortTap,
+} from './header-visibility';
 
 function dispatchPointer(
   target: Element,
@@ -153,6 +159,93 @@ describe('bindTouchTap', () => {
     dispatchPointer(reader, 'pointercancel');
     dispatchPointer(reader, 'pointerup');
     expect(onTap).not.toHaveBeenCalled();
+
+    unbind();
+  });
+});
+
+describe('bindMouseReadingClick', () => {
+  it('handles a short primary mouse click but ignores touch and drag gestures', () => {
+    const reader = document.createElement('main');
+    const onClick = vi.fn();
+    const unbind = bindMouseReadingClick(reader, onClick);
+
+    dispatchPointer(reader, 'pointerdown', { pointerType: 'mouse' });
+    dispatchPointer(reader, 'pointerup', { pointerType: 'mouse' });
+    expect(onClick).toHaveBeenCalledTimes(1);
+
+    dispatchPointer(reader, 'pointerdown');
+    dispatchPointer(reader, 'pointerup');
+    dispatchPointer(reader, 'pointerdown', { pointerType: 'mouse' });
+    dispatchPointer(reader, 'pointerup', { pointerType: 'mouse', clientX: 150 });
+    expect(onClick).toHaveBeenCalledTimes(1);
+
+    unbind();
+  });
+
+  it('does not toggle for text selection or interactive content', () => {
+    const reader = document.createElement('main');
+    const paragraph = document.createElement('p');
+    const text = document.createTextNode('Выделяемый текст');
+    const link = document.createElement('a');
+    link.href = '#note';
+    link.textContent = 'Сноска';
+    paragraph.append(text, link);
+    reader.append(paragraph);
+    document.body.append(reader);
+
+    const onClick = vi.fn();
+    const unbind = bindMouseReadingClick(reader, onClick);
+    const selection = document.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(paragraph);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+
+    dispatchPointer(reader, 'pointerdown', { pointerType: 'mouse' });
+    dispatchPointer(reader, 'pointerup', { pointerType: 'mouse' });
+    selection?.removeAllRanges();
+
+    dispatchPointer(reader, 'pointerdown', { pointerType: 'mouse' });
+    selection?.addRange(range);
+    dispatchPointer(reader, 'pointerup', { pointerType: 'mouse' });
+    selection?.removeAllRanges();
+
+    dispatchPointer(link, 'pointerdown', { pointerType: 'mouse' });
+    dispatchPointer(link, 'pointerup', { pointerType: 'mouse' });
+    expect(onClick).not.toHaveBeenCalled();
+
+    unbind();
+    reader.remove();
+  });
+});
+
+describe('bindTouchSwipe', () => {
+  it('handles horizontal touch swipes in both directions', () => {
+    const reader = document.createElement('main');
+    const onSwipe = vi.fn();
+    const unbind = bindTouchSwipe(reader, onSwipe);
+
+    dispatchPointer(reader, 'pointerdown', { clientX: 100 });
+    dispatchPointer(reader, 'pointerup', { clientX: 40 });
+    dispatchPointer(reader, 'pointerdown', { clientX: 40 });
+    dispatchPointer(reader, 'pointerup', { clientX: 100 });
+    expect(onSwipe).toHaveBeenNthCalledWith(1, -60);
+    expect(onSwipe).toHaveBeenNthCalledWith(2, 60);
+
+    unbind();
+  });
+
+  it('ignores mouse drags and short touch movement', () => {
+    const reader = document.createElement('main');
+    const onSwipe = vi.fn();
+    const unbind = bindTouchSwipe(reader, onSwipe);
+
+    dispatchPointer(reader, 'pointerdown', { pointerType: 'mouse', clientX: 100 });
+    dispatchPointer(reader, 'pointerup', { pointerType: 'mouse', clientX: 20 });
+    dispatchPointer(reader, 'pointerdown', { clientX: 100 });
+    dispatchPointer(reader, 'pointerup', { clientX: 70 });
+    expect(onSwipe).not.toHaveBeenCalled();
 
     unbind();
   });

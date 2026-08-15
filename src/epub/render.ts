@@ -1,4 +1,5 @@
 import { appendBookChunks } from '../book/dom';
+import { inlineFootnoteText } from '../book/footnotes';
 import { normalizedText, type BookTocItem, type RenderedBook } from '../book/model';
 import { decodeXml } from '../fb2/decode';
 import type { ParsedEpub } from './model';
@@ -413,7 +414,10 @@ export function renderEpub(parsed: ParsedEpub): RenderedBook {
           target.setAttribute('href', `#${targetInfo.id}`);
           if (hasToken(source, NOTE_REF_TOKENS) || targetInfo.note) {
             target.className = 'footnote-link';
-            target.dataset.noteText = targetInfo.text;
+            target.dataset.noteText = inlineFootnoteText(
+              normalizedText(source),
+              targetInfo.text,
+            );
           } else {
             target.className = 'book-internal-link';
           }
