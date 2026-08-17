@@ -34,6 +34,17 @@ describe('FB2 source decoder', () => {
     expect(result.xml).toContain('<FictionBook');
   });
 
+  it('identifies exact source bytes independently of the filename', async () => {
+    const bytes = new TextEncoder().encode(validBook);
+    const first = await decodeBookBytes(bytes, 'first-name.fb2');
+    const renamed = await decodeBookBytes(bytes, 'renamed.fb2');
+    const changed = await decodeBookBytes(new TextEncoder().encode(`${validBook} `), 'first-name.fb2');
+
+    expect(first.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
+    expect(renamed.fingerprint).toBe(first.fingerprint);
+    expect(changed.fingerprint).not.toBe(first.fingerprint);
+  });
+
   it('respects a windows-1251 XML declaration', () => {
     const prefix = new TextEncoder().encode(
       '<?xml version="1.0" encoding="windows-1251"?><FictionBook><book-title>',

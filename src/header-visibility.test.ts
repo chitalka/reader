@@ -162,6 +162,34 @@ describe('bindTouchTap', () => {
 
     unbind();
   });
+
+  it('does not toggle for an active selection or a saved quote highlight', () => {
+    const reader = document.createElement('main');
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'Выделенный текст';
+    const highlight = document.createElement('mark');
+    highlight.dataset.readerQuote = 'quote-1';
+    highlight.textContent = 'Сохранённая цитата';
+    reader.append(paragraph, highlight);
+    document.body.append(reader);
+    const onTap = vi.fn();
+    const unbind = bindTouchTap(reader, onTap);
+
+    const selection = document.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(paragraph);
+    selection?.addRange(range);
+    dispatchPointer(paragraph, 'pointerdown');
+    dispatchPointer(paragraph, 'pointerup');
+    selection?.removeAllRanges();
+
+    dispatchPointer(highlight, 'pointerdown');
+    dispatchPointer(highlight, 'pointerup');
+
+    expect(onTap).not.toHaveBeenCalled();
+    unbind();
+    reader.remove();
+  });
 });
 
 describe('bindMouseReadingClick', () => {
@@ -190,7 +218,10 @@ describe('bindMouseReadingClick', () => {
     const link = document.createElement('a');
     link.href = '#note';
     link.textContent = 'Сноска';
-    paragraph.append(text, link);
+    const highlight = document.createElement('mark');
+    highlight.dataset.readerQuote = 'quote-1';
+    highlight.textContent = 'Цитата';
+    paragraph.append(text, link, highlight);
     reader.append(paragraph);
     document.body.append(reader);
 
@@ -213,6 +244,8 @@ describe('bindMouseReadingClick', () => {
 
     dispatchPointer(link, 'pointerdown', { pointerType: 'mouse' });
     dispatchPointer(link, 'pointerup', { pointerType: 'mouse' });
+    dispatchPointer(highlight, 'pointerdown', { pointerType: 'mouse' });
+    dispatchPointer(highlight, 'pointerup', { pointerType: 'mouse' });
     expect(onClick).not.toHaveBeenCalled();
 
     unbind();

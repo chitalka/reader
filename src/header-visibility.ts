@@ -14,7 +14,7 @@ export function isShortTap(start: TouchPoint | undefined, end: TouchPoint): bool
 }
 
 export function bindTouchTap(target: HTMLElement, onTap: () => void): () => void {
-  let start: TouchPoint | undefined;
+  let start: (TouchPoint & { selectionActive: boolean; blocked: boolean }) | undefined;
 
   const handlePointerDown = (event: PointerEvent) => {
     if (!event.isPrimary || event.pointerType === 'mouse') return;
@@ -22,12 +22,19 @@ export function bindTouchTap(target: HTMLElement, onTap: () => void): () => void
       pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
+      selectionActive: hasTextSelection(target.ownerDocument),
+      blocked: isToggleBlockedTarget(event.target),
     };
   };
   const handlePointerUp = (event: PointerEvent) => {
     if (!event.isPrimary || event.pointerType === 'mouse') return;
     const end = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-    if (isShortTap(start, end)) onTap();
+    if (
+      isShortTap(start, end)
+      && !start?.selectionActive
+      && !start?.blocked
+      && !hasTextSelection(target.ownerDocument)
+    ) onTap();
     start = undefined;
   };
   const handlePointerCancel = () => {
@@ -50,9 +57,9 @@ function hasTextSelection(document: Document): boolean {
   return Boolean(selection && !selection.isCollapsed && selection.toString().trim());
 }
 
-function isInteractiveTarget(target: EventTarget | null): boolean {
+function isToggleBlockedTarget(target: EventTarget | null): boolean {
   return target instanceof Element
-    && Boolean(target.closest('a, button, input, textarea, select, label'));
+    && Boolean(target.closest('a, button, input, textarea, select, label, [data-reader-quote]'));
 }
 
 export function bindMouseReadingClick(target: HTMLElement, onClick: () => void): () => void {
@@ -65,7 +72,7 @@ export function bindMouseReadingClick(target: HTMLElement, onClick: () => void):
       x: event.clientX,
       y: event.clientY,
       selectionActive: hasTextSelection(target.ownerDocument),
-      interactive: isInteractiveTarget(event.target),
+      interactive: isToggleBlockedTarget(event.target),
     };
   };
   const handlePointerUp = (event: PointerEvent) => {

@@ -227,6 +227,38 @@ export class ReaderPager {
     return true;
   }
 
+  goToTextOffset(anchor: string, offset: number, preserveTarget = false): boolean {
+    const element = this.anchorElements.get(anchor);
+    const chunkIndex = this.anchorChunks.get(anchor);
+    if (!element || chunkIndex === undefined || !this.navigationChunks.includes(chunkIndex)) return false;
+    this.cancelNavigationAnimations();
+    this.activeAnchor = anchor;
+    if (chunkIndex !== this.currentChunkIndex) this.mountChunk(chunkIndex);
+    this.performLayout({ anchor, chunk: chunkIndex });
+
+    const page = this.pageForTextOffset(element, offset);
+    if (page !== undefined) {
+      this.currentColumn = this.spreadStart(page);
+      this.activeAnchor = anchor;
+      const anchorRect = element.getClientRects()[0];
+      const viewportRect = this.viewport.getBoundingClientRect();
+      const anchorPage = this.pageForElement(element);
+      this.activeAnchorVisible = Boolean(
+        anchorRect
+        && anchorPage >= this.currentColumn
+        && anchorPage < this.currentColumn + this.pagesPerView
+        && anchorRect.top >= viewportRect.top - 0.5
+        && anchorRect.top < viewportRect.bottom + 0.5,
+      );
+      this.moveToCurrent(false);
+      if (!preserveTarget) {
+        this.captureVisibleAnchor();
+        this.moveToCurrent(false);
+      }
+    }
+    return true;
+  }
+
   goToId(id: string): boolean {
     const element = this.idElements.get(id);
     const chunkIndex = this.idChunks.get(id);
@@ -551,6 +583,51 @@ export class ReaderPager {
     const elementLeft = this.firstRect(element).left;
     const offset = Math.max(0, elementLeft - contentLeft);
     return Math.min(this.pageCount - 1, Math.floor(offset / this.pageExtent + 0.02));
+  }
+
+  private pageForTextOffset(element: HTMLElement, requestedOffset: number): number | undefined {
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        return node.parentElement?.closest('script, style')
+          ? NodeFilter.FILTER_REJECT
+          : NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    const nodes: Text[] = [];
+    let candidate = walker.nextNode();
+    while (candidate) {
+      nodes.push(candidate as Text);
+      candidate = walker.nextNode();
+    }
+    if (!nodes.length) return this.pageForElement(element);
+
+    const total = nodes.reduce((sum, node) => sum + node.data.length, 0);
+    const target = Math.max(0, Math.min(Math.max(0, total - 1), requestedOffset));
+    let consumed = 0;
+    let selected = nodes.at(-1)!;
+    let localOffset = selected.data.length ? selected.data.length - 1 : 0;
+    for (const node of nodes) {
+      const end = consumed + node.data.length;
+      if (target < end) {
+        selected = node;
+        localOffset = target - consumed;
+        break;
+      }
+      consumed = end;
+    }
+
+    const range = document.createRange();
+    try {
+      range.setStart(selected, localOffset);
+      range.setEnd(selected, Math.min(selected.data.length, localOffset + 1));
+    } catch {
+      return undefined;
+    }
+    const rect = range.getClientRects()[0] ?? range.getBoundingClientRect();
+    if (!rect || (!rect.width && !rect.height)) return undefined;
+    const contentLeft = this.content.getBoundingClientRect().left;
+    const pageOffset = Math.max(0, rect.left - contentLeft);
+    return Math.min(this.pageCount - 1, Math.floor(pageOffset / this.pageExtent + 0.02));
   }
 
   private firstRect(element: HTMLElement): DOMRect {

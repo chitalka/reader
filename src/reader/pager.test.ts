@@ -237,6 +237,47 @@ describe('ReaderPager', () => {
     });
   });
 
+  it('navigates to the page containing an exact text offset inside a long anchor', async () => {
+    const longParagraph = anchor('long-paragraph', 0, 80);
+    longParagraph.textContent = 'Текст длинного абзаца';
+    const targetLeft = 4 * 566 + 20;
+    const targetRect = {
+      left: targetLeft,
+      right: targetLeft + 12,
+      top: 80,
+      bottom: 100,
+      width: 12,
+      height: 20,
+      x: targetLeft,
+      y: 80,
+      toJSON: () => ({}),
+    } as DOMRect;
+    const createRange = document.createRange.bind(document);
+    const rangeSpy = vi.spyOn(document, 'createRange').mockImplementation(() => {
+      const range = createRange();
+      Object.defineProperty(range, 'getClientRects', {
+        configurable: true,
+        value: () => [targetRect] as unknown as DOMRectList,
+      });
+      Object.defineProperty(range, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => targetRect,
+      });
+      return range;
+    });
+    const fragment = document.createDocumentFragment();
+    fragment.append(longParagraph);
+    await pager.setBook(fragment);
+
+    expect(pager.goToTextOffset('long-paragraph', 8, true)).toBe(true);
+    expect(pager.getSnapshot()).toMatchObject({
+      currentPage: 5,
+      anchor: 'long-paragraph',
+      anchorVisible: false,
+    });
+    rangeSpy.mockRestore();
+  });
+
   it('uses the saved column when the anchor no longer exists', async () => {
     await pager.setBook(document.createDocumentFragment(), {
       anchor: 'removed',

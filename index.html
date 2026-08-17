@@ -40,6 +40,20 @@
             </svg>
           </button>
           <button
+            id="annotations-button"
+            class="icon-button"
+            type="button"
+            aria-label="Закладки и цитаты"
+            aria-haspopup="dialog"
+            aria-controls="annotations-panel"
+            aria-expanded="false"
+            hidden
+          >
+            <svg class="bookmark-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6.5 3.5h11v17L12 17l-5.5 3.5v-17Z" />
+            </svg>
+          </button>
+          <button
             id="settings-button"
             class="icon-button"
             type="button"
@@ -81,6 +95,52 @@
           </button>
         </div>
         <nav id="toc-list-root" class="toc-navigation" aria-label="Разделы книги"></nav>
+      </section>
+
+      <div id="annotations-backdrop" class="panel-backdrop annotations-backdrop" hidden></div>
+      <section
+        id="annotations-panel"
+        class="annotations-panel"
+        role="dialog"
+        aria-labelledby="annotations-title"
+        hidden
+      >
+        <div class="annotations-panel-header">
+          <h2 id="annotations-title">Закладки и цитаты</h2>
+          <button id="annotations-close" class="panel-close" type="button" aria-label="Закрыть закладки">
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+        <div class="annotation-tabs" role="tablist" aria-label="Сохранённые места">
+          <button id="bookmarks-tab" type="button" role="tab" aria-selected="true" aria-controls="bookmarks-view">
+            Закладки
+          </button>
+          <button id="quotes-tab" type="button" role="tab" aria-selected="false" aria-controls="quotes-view" tabindex="-1">
+            Цитаты
+          </button>
+        </div>
+        <div id="bookmarks-view" class="annotation-view" role="tabpanel" aria-labelledby="bookmarks-tab">
+          <button id="add-bookmark" class="annotation-primary-action" type="button">
+            Добавить текущее место
+          </button>
+          <div id="bookmarks-list" class="annotation-list"></div>
+        </div>
+        <div id="quotes-view" class="annotation-view" role="tabpanel" aria-labelledby="quotes-tab" hidden>
+          <div id="quotes-list" class="annotation-list"></div>
+        </div>
+        <form id="annotation-editor" class="annotation-editor" hidden>
+          <h3 id="annotation-editor-title">Редактировать</h3>
+          <div id="annotation-editor-colors" class="annotation-colors" role="radiogroup" aria-label="Цвет"></div>
+          <label>
+            <span>Заметка</span>
+            <textarea id="annotation-editor-note" rows="4" maxlength="2000" placeholder="Необязательно"></textarea>
+          </label>
+          <div class="annotation-editor-actions">
+            <button id="annotation-editor-delete" class="annotation-delete" type="button">Удалить</button>
+            <button id="annotation-editor-cancel" type="button">Отмена</button>
+            <button class="annotation-save" type="submit">Сохранить</button>
+          </div>
+        </form>
       </section>
 
       <div id="settings-backdrop" class="settings-backdrop" hidden></div>
@@ -170,6 +230,29 @@
             </label>
           </div>
         </fieldset>
+
+        <fieldset class="settings-group sync-settings">
+          <legend>Синхронизация</legend>
+          <p class="settings-help">Вход необязателен. Книги не загружаются в облако.</p>
+          <div class="sync-provider">
+            <div>
+              <strong>Google Drive</strong>
+              <span id="google-sync-status">Не подключён</span>
+            </div>
+            <button id="google-connect" type="button">Подключить</button>
+          </div>
+          <div class="sync-provider">
+            <div>
+              <strong>Яндекс.Диск</strong>
+              <span id="yandex-sync-status">Не подключён</span>
+            </div>
+            <button id="yandex-connect" type="button">Подключить</button>
+          </div>
+          <div class="sync-summary">
+            <span id="sync-last-time">Синхронизации ещё не было</span>
+            <button id="sync-now" type="button" disabled>Синхронизировать</button>
+          </div>
+        </fieldset>
       </section>
 
       <main id="drop-zone" class="reader-shell" aria-busy="true">
@@ -226,6 +309,20 @@
       </main>
 
       <div id="toast" class="toast" role="alert" hidden></div>
+
+      <form id="quote-menu" class="quote-menu" role="dialog" aria-label="Сохранить цитату" hidden>
+        <button id="quote-menu-close" class="quote-menu-close" type="button" aria-label="Закрыть">×</button>
+        <p id="quote-menu-preview" class="quote-menu-preview"></p>
+        <div id="quote-menu-colors" class="annotation-colors" role="radiogroup" aria-label="Цвет цитаты"></div>
+        <label>
+          <span>Заметка</span>
+          <textarea id="quote-menu-note" rows="3" maxlength="2000" placeholder="Необязательно"></textarea>
+        </label>
+        <div class="quote-menu-actions">
+          <button id="quote-menu-delete" class="annotation-delete" type="button" hidden>Удалить</button>
+          <button id="quote-menu-save" class="annotation-save" type="submit">Сохранить цитату</button>
+        </div>
+      </form>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

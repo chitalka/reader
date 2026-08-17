@@ -14,7 +14,9 @@ Chitalka is a fast, local-first browser reader for FB2 and EPUB books. Files sel
 - Supports page buttons, keyboard navigation, touch swipes, and accelerated page turns from repeated input.
 - Automatically hides the header while reading. Move the mouse to reveal it, or tap the reading area to toggle it on touch devices.
 - Offers adjustable font size, light and dark themes, one- or two-page modes, footnote modes, and configurable page buttons.
-- Saves settings globally and stores each reading position in `localStorage`, keyed by the selected file name and anchored to visible book content.
+- Saves books, settings, reading positions, bookmarks, and highlighted quotes locally in IndexedDB. Books are identified by the SHA-256 hash of their original bytes, so renaming a file does not lose its state.
+- Supports optional, local-first synchronization through the private application folders in Google Drive and Yandex Disk. Both providers can be connected at the same time.
+- Adds bookmarks at the current reading position and persistent highlighted quotes in six colors, with an optional note for either type.
 - Displays embedded covers and illustrations and estimates the remaining reading time.
 
 The bundled edition of *Anna Karenina* opens automatically as the demo book. Use **Open book** or drag and drop another supported file anywhere onto the reader.
@@ -41,7 +43,7 @@ EPUB scripts and author styles are not executed. External resources are not load
 
 ## Browser requirements
 
-Use a recent version of Chrome, Firefox, Safari, or another browser with ES2022, Web Animations, `DOMParser`, `TextDecoder`, and `localStorage` support. Both desktop and touch layouts are supported.
+Use a recent version of Chrome, Firefox, Safari, or another browser with ES2022, Web Animations, `DOMParser`, `TextDecoder`, Web Crypto, IndexedDB, and `localStorage` support. Both desktop and touch layouts are supported.
 
 ## Local development
 
@@ -69,6 +71,40 @@ npm run preview
 
 Continuous integration runs the test suite and production build on GitHub Actions.
 
+## Optional cloud synchronization
+
+Synchronization has no Chitalka server. The reader requests the smallest available application-folder permission, stores immutable JSON snapshots in the user's Google Drive or Yandex Disk, and merges them locally. Settings are merged field by field; positions, bookmarks, quotes, edits, and deletions use deterministic logical revisions so offline devices converge without relying on their wall clocks.
+
+Cloud authorization is optional. Access tokens are kept only in memory and are never written to IndexedDB or `localStorage`, so a provider must be reconnected after a reload or token expiry. Snapshot contents are not encrypted: the cloud provider can read book metadata, positions, notes, and quote text.
+
+Copy the example configuration before running or building the app:
+
+```bash
+cp .env.example .env.local
+```
+
+Set one or both public application IDs in `.env.local`. Never add an OAuth client secret: this static browser application uses the Google token model and Yandex authorization code flow with PKCE.
+
+The repository's `.env.production` contains only the public client IDs used by the deployed demo. Its Yandex application is registered exclusively for the production callback, so local Yandex authorization requires a separate development application and a local override in `.env.local`.
+
+### Google Drive
+
+1. Create a **Web application** OAuth client, enable the Google Drive API, and configure the consent screen.
+2. Add the site origin to **Authorized JavaScript origins**. For the default development server use `http://localhost:5173`; for the demo use `https://chitalka.github.io`.
+3. Put the client ID in `VITE_GOOGLE_CLIENT_ID`.
+
+Chitalka requests only `https://www.googleapis.com/auth/drive.appdata`, a non-sensitive scope for data hidden in the app's private Drive folder. See Google's official guides for [browser OAuth setup](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid), the [token model](https://developers.google.com/identity/oauth2/web/guides/use-token-model), and the [application data folder](https://developers.google.com/workspace/drive/api/guides/appdata).
+
+### Yandex Disk
+
+1. Create a Yandex OAuth application for user authorization and grant it only the application-folder Disk permission (`cloud_api:disk.app_folder`). Use separate OAuth applications for development and production.
+2. Configure the matching **Redirect URI** exactly:
+   - development: `http://localhost:5173/oauth/yandex-callback.html`
+   - demo: `https://chitalka.github.io/demo/oauth/yandex-callback.html`
+3. Put the application ID in `VITE_YANDEX_CLIENT_ID`.
+
+The callback exchanges the authorization code with PKCE, without a client secret. See the official Yandex guides for [registering an application](https://yandex.com/dev/id/doc/en/register-auth), [authorization code and PKCE](https://yandex.com/dev/id/doc/en/codes/code-url), and the [Disk REST API](https://yandex.com/dev/disk/rest/).
+
 ## Project structure
 
 ```text
@@ -76,7 +112,8 @@ src/
 ├── book/            Shared book model and DOM chunking
 ├── epub/            EPUB archive parsing and safe DOM rendering
 ├── fb2/             FB2 loading, decoding, parsing, and rendering
-├── reader/          Pagination and safe local persistence
+├── reader/          Pagination, IndexedDB state, bookmarks, and quotes
+├── sync/            Provider-neutral sync engine and cloud adapters
 ├── app.ts           Application workflows and UI coordination
 ├── settings.ts      Reader settings and defaults
 ├── main.ts          Application entry point

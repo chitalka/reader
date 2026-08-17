@@ -2,5 +2,8 @@ node_modules/
 dist/
 coverage/
 TODO/
+.env
+.env.local
+.env.*.local
 .DS_Store
 *.log

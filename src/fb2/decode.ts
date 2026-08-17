@@ -3,8 +3,10 @@ import { unzip } from 'fflate';
 export interface DecodedFb2Source {
   format: 'fb2';
   xml: string;
-  /** The name selected by the reader. Used as the stable local book key. */
+  /** The name selected by the reader. Used only for display and legacy migration. */
   filename: string;
+  /** SHA-256 of the exact source bytes. Used as the stable local book key. */
+  fingerprint: string;
   /** The actual FB2 entry name when the source is an archive. */
   contentFilename: string;
 }
@@ -12,13 +14,21 @@ export interface DecodedFb2Source {
 export interface DecodedEpubSource {
   format: 'epub';
   files: Record<string, Uint8Array>;
-  /** The name selected by the reader. Used as the stable local book key. */
+  /** The name selected by the reader. Used only for display and legacy migration. */
   filename: string;
+  /** SHA-256 of the exact source bytes. Used as the stable local book key. */
+  fingerprint: string;
 }
 
 export type DecodedBookSource = DecodedFb2Source | DecodedEpubSource;
 
 const ZIP_SIGNATURE = [0x50, 0x4b] as const;
+
+export async function sha256(bytes: Uint8Array): Promise<string> {
+  const source = new Uint8Array(bytes).buffer;
+  const digest = await crypto.subtle.digest('SHA-256', source);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 function hasZipSignature(bytes: Uint8Array): boolean {
   return bytes[0] === ZIP_SIGNATURE[0] && bytes[1] === ZIP_SIGNATURE[1];
@@ -72,20 +82,27 @@ export function decodeXml(bytes: Uint8Array): string {
 }
 
 export async function decodeBookBytes(bytes: Uint8Array, filename: string): Promise<DecodedBookSource> {
+  const fingerprintPromise = sha256(bytes);
   const epubFilename = /\.epub$/iu.test(filename);
   if (epubFilename && !hasZipSignature(bytes)) {
     throw new Error('Некорректный EPUB: файл не является ZIP-архивом');
   }
   const zipped = epubFilename || /\.zip$/iu.test(filename) || hasZipSignature(bytes);
   if (!zipped) {
-    return { format: 'fb2', xml: decodeXml(bytes), filename, contentFilename: filename };
+    return {
+      format: 'fb2',
+      xml: decodeXml(bytes),
+      filename,
+      fingerprint: await fingerprintPromise,
+      contentFilename: filename,
+    };
   }
 
   const files = await unzipAsync(bytes);
   const epubContainer = Object.keys(files)
     .find((name) => name.replaceAll('\\', '/').toLocaleLowerCase() === 'meta-inf/container.xml');
   if (epubFilename || epubContainer) {
-    return { format: 'epub', files, filename };
+    return { format: 'epub', files, filename, fingerprint: await fingerprintPromise };
   }
   const entries = Object.entries(files).filter(([name]) => !name.endsWith('/'));
   const entry = entries.find(([name]) => /\.fb2$/iu.test(name));
@@ -95,7 +112,13 @@ export async function decodeBookBytes(bytes: Uint8Array, filename: string): Prom
   }
 
   const [entryName, content] = entry;
-  return { format: 'fb2', xml: decodeXml(content), filename, contentFilename: entryName };
+  return {
+    format: 'fb2',
+    xml: decodeXml(content),
+    filename,
+    fingerprint: await fingerprintPromise,
+    contentFilename: entryName,
+  };
 }
 
 export async function decodeBookFile(file: File): Promise<DecodedBookSource> {

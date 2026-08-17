@@ -60,7 +60,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -241,7 +242,8 @@ button:disabled {
 }
 
 .settings-icon,
-.toc-icon {
+.toc-icon,
+.bookmark-icon {
   display: block;
   width: 21px;
   height: 21px;
@@ -254,6 +256,10 @@ button:disabled {
 
 .toc-icon {
   stroke-width: 2;
+}
+
+.bookmark-icon {
+  stroke-width: 1.9;
 }
 
 .open-button {
@@ -395,6 +401,7 @@ button:disabled {
   right: clamp(16px, 3vw, 48px);
   display: grid;
   width: min(340px, calc(100vw - 32px));
+  max-height: calc(100dvh - var(--reader-edge-gap) - 16px);
   gap: 18px;
   padding: 20px;
   overflow: auto;
@@ -405,6 +412,428 @@ button:disabled {
   box-shadow: var(--popover-shadow);
   animation: settings-popover-in 160ms ease-out;
   backdrop-filter: blur(20px);
+}
+
+.annotations-panel {
+  position: fixed;
+  z-index: 40;
+  top: var(--reader-edge-gap);
+  right: var(--layout-gutter);
+  display: grid;
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100dvh - var(--reader-edge-gap) - 16px);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface-solid) 96%, transparent);
+  box-shadow: var(--popover-shadow);
+  animation: settings-popover-in 160ms ease-out;
+  backdrop-filter: blur(20px);
+}
+
+.annotations-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.annotations-panel h2,
+.annotations-panel h3 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 600;
+}
+
+.annotations-panel h2 {
+  font-size: 20px;
+}
+
+.annotations-panel h3 {
+  font-size: 17px;
+}
+
+.annotation-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 58%, var(--surface-solid));
+}
+
+.annotation-tabs button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.annotation-tabs button[aria-selected="true"] {
+  color: var(--accent-strong);
+  background: var(--surface-solid);
+  box-shadow: var(--control-shadow);
+}
+
+.annotation-view {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.annotation-primary-action,
+.annotation-save,
+.sync-provider button,
+.sync-summary button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  color: #fff;
+  background: var(--accent);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.annotation-primary-action {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.annotation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.annotation-empty {
+  padding: 28px 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.annotation-card {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-solid) 72%, transparent);
+}
+
+.annotation-card-color {
+  width: 8px;
+  height: 100%;
+  min-height: 38px;
+  border-radius: 999px;
+  background: var(--quote-color);
+}
+
+.annotation-card-main {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.annotation-card-main strong,
+.annotation-card-main span {
+  display: block;
+}
+
+.annotation-card-main strong {
+  overflow: hidden;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-card-main span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.annotation-card-edit {
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.annotation-card-edit:hover {
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.annotation-editor {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 20px;
+  overflow: auto;
+  border-radius: inherit;
+  background: var(--surface-solid);
+}
+
+.annotation-editor label,
+.quote-menu label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.annotation-editor textarea,
+.quote-menu textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--bg) 42%, var(--surface-solid));
+  line-height: 1.4;
+}
+
+.annotation-editor-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.annotation-editor-actions button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.annotation-editor-actions .annotation-delete {
+  margin-right: auto;
+  color: #b42318;
+}
+
+.annotation-editor-actions .annotation-save {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+}
+
+.annotation-colors {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.annotation-color {
+  position: relative;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--quote-color);
+  cursor: pointer;
+}
+
+.annotation-color[aria-checked="true"] {
+  border-color: var(--text);
+  box-shadow: inset 0 0 0 3px var(--surface-solid);
+}
+
+.annotation-color:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--focus) 75%, transparent);
+  outline-offset: 3px;
+}
+
+[data-quote-color="purple"],
+.annotation-color[data-color="purple"],
+.annotation-card[data-color="purple"] { --quote-color: rgba(139, 92, 246, 0.38); }
+[data-quote-color="blue"],
+.annotation-color[data-color="blue"],
+.annotation-card[data-color="blue"] { --quote-color: rgba(59, 130, 246, 0.34); }
+[data-quote-color="green"],
+.annotation-color[data-color="green"],
+.annotation-card[data-color="green"] { --quote-color: rgba(34, 197, 94, 0.34); }
+[data-quote-color="yellow"],
+.annotation-color[data-color="yellow"],
+.annotation-card[data-color="yellow"] { --quote-color: rgba(234, 179, 8, 0.4); }
+[data-quote-color="orange"],
+.annotation-color[data-color="orange"],
+.annotation-card[data-color="orange"] { --quote-color: rgba(249, 115, 22, 0.36); }
+[data-quote-color="pink"],
+.annotation-color[data-color="pink"],
+.annotation-card[data-color="pink"] { --quote-color: rgba(236, 72, 153, 0.34); }
+
+.book-content { --quote-selection-color: rgba(139, 92, 246, 0.38); }
+.book-content[data-quote-selection-color="purple"] { --quote-selection-color: rgba(139, 92, 246, 0.38); }
+.book-content[data-quote-selection-color="blue"] { --quote-selection-color: rgba(59, 130, 246, 0.34); }
+.book-content[data-quote-selection-color="green"] { --quote-selection-color: rgba(34, 197, 94, 0.34); }
+.book-content[data-quote-selection-color="yellow"] { --quote-selection-color: rgba(234, 179, 8, 0.4); }
+.book-content[data-quote-selection-color="orange"] { --quote-selection-color: rgba(249, 115, 22, 0.36); }
+.book-content[data-quote-selection-color="pink"] { --quote-selection-color: rgba(236, 72, 153, 0.34); }
+
+.book-content ::selection {
+  color: inherit;
+  background: var(--quote-selection-color);
+}
+
+:root { --quote-preview-color: rgba(139, 92, 246, 0.38); }
+:root[data-quote-preview-color="purple"] { --quote-preview-color: rgba(139, 92, 246, 0.38); }
+:root[data-quote-preview-color="blue"] { --quote-preview-color: rgba(59, 130, 246, 0.34); }
+:root[data-quote-preview-color="green"] { --quote-preview-color: rgba(34, 197, 94, 0.34); }
+:root[data-quote-preview-color="yellow"] { --quote-preview-color: rgba(234, 179, 8, 0.4); }
+:root[data-quote-preview-color="orange"] { --quote-preview-color: rgba(249, 115, 22, 0.36); }
+:root[data-quote-preview-color="pink"] { --quote-preview-color: rgba(236, 72, 153, 0.34); }
+
+::highlight(reader-quote-preview) {
+  color: inherit;
+  background: var(--quote-preview-color);
+}
+
+.reader-quote-preview {
+  padding: 0;
+  color: inherit;
+  background: var(--quote-color);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.reader-quote-highlight {
+  padding: 0;
+  color: inherit;
+  background: var(--quote-color);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  cursor: pointer;
+}
+
+.quote-menu {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  width: min(360px, calc(100vw - 24px));
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  color: var(--text);
+  background: var(--surface-solid);
+  box-shadow: var(--popover-shadow);
+}
+
+.quote-menu-close {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.quote-menu-preview {
+  max-height: 4.2em;
+  padding-right: 28px;
+  margin: 0;
+  overflow: hidden;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.quote-menu-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.quote-menu-actions .annotation-save {
+  flex: 1;
+}
+
+.quote-menu-actions .annotation-delete {
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, #b42318 45%, var(--line));
+  border-radius: 10px;
+  color: #b42318;
+  background: transparent;
+  cursor: pointer;
+}
+
+.settings-help {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sync-provider {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.sync-provider > div {
+  display: grid;
+  gap: 2px;
+}
+
+.sync-provider strong {
+  font-size: 13px;
+}
+
+.sync-provider span,
+.sync-summary span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sync-provider button,
+.sync-summary button {
+  min-height: 34px;
+  padding-inline: 10px;
+  font-size: 12px;
+}
+
+.sync-summary {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.sync-summary button {
+  justify-self: start;
 }
 
 .settings-panel-header {
@@ -1140,6 +1569,29 @@ progress::-moz-progress-bar {
     animation-name: settings-sheet-in;
   }
 
+  .annotations-panel {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: min(82dvh, 680px);
+    padding: 20px max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 24px 24px 0 0;
+    animation-name: settings-sheet-in;
+  }
+
+  .quote-menu {
+    right: 12px !important;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 12px !important;
+    top: auto !important;
+    width: auto;
+  }
+
   @keyframes settings-sheet-in {
     from { transform: translateY(28px); opacity: 0; }
   }
@@ -1201,6 +1653,8 @@ progress::-moz-progress-bar {
 
   .app-header,
   .toc-panel,
+  .annotations-panel,
+  .quote-menu,
   .panel-backdrop,
   .settings-panel,
   .settings-backdrop,
