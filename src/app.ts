@@ -10,9 +10,12 @@ import {
   bindMouseReadingClick,
   bindTouchSwipe,
   bindTouchTap,
+  swipeTurnDirection,
 } from './header-visibility';
+import { VisibilityMotion } from './motion';
 import { ReaderPager, type PagerSnapshot, type PageMode } from './reader/pager';
 import { JsonStorage, positionStorage } from './reader/storage';
+import { OnboardingHints } from './onboarding';
 import { SettingsPanelController } from './settings-panel';
 import { TocPanelController } from './toc-panel';
 import { AnnotationPanelController, QuoteMenuController } from './annotations-panel';
@@ -37,6 +40,7 @@ import { GoogleDriveProvider } from './sync/google';
 import { YandexDiskProvider } from './sync/yandex';
 import { SyncEngine } from './sync/engine';
 import type { CloudProvider, ProviderStatusEvent } from './sync/provider';
+import { hideLoadingOverlay, showLoadingOverlay } from './splash';
 import {
   DEFAULT_SETTINGS,
   normalizePageButtonsMode,
@@ -68,6 +72,7 @@ function tocTargets(items: BookTocItem[]): string[] {
 }
 
 export class ChitalkaApp {
+  private readonly onboarding = new OnboardingHints();
   private readonly settingsStorage = new JsonStorage<ReaderSettings>(
     'chitalka:settings:v1',
     DEFAULT_SETTINGS,
@@ -166,9 +171,15 @@ export class ChitalkaApp {
   private readonly footnoteModeInputs = requiredInputs('footnote-mode');
   private readonly backButton = requiredElement<HTMLButtonElement>('back-to-text');
   private readonly toast = requiredElement<HTMLElement>('toast');
+  private readonly toastMotion = new VisibilityMotion(this.toast);
   private readonly appRoot = requiredElement<HTMLElement>('app');
   private readonly header = requiredElement<HTMLElement>('app-header');
-  private readonly headerVisibility = new HeaderVisibilityController(this.appRoot, this.header);
+  private readonly headerVisibility = new HeaderVisibilityController(
+    this.appRoot,
+    this.header,
+    undefined,
+    () => this.showHeaderHint(),
+  );
   private readonly settingsPanelController: SettingsPanelController;
   private readonly tocPanelController: TocPanelController;
   private readonly annotationPanelController: AnnotationPanelController;
@@ -336,9 +347,23 @@ export class ChitalkaApp {
     document.addEventListener('keydown', (event) => this.handleKeydown(event));
     bindMouseReadingClick(this.viewport, () => this.headerVisibility.toggle());
     bindTouchTap(this.viewport, () => this.headerVisibility.toggle());
-    bindTouchSwipe(this.viewport, (distance) => {
-      if (distance < 0) this.navigate(() => this.pager.next());
-      else this.navigateBackward();
+    bindTouchSwipe(this.viewport, {
+      start: () => this.pager.beginSwipe(),
+      move: (distance) => this.pager.updateSwipe(distance),
+      end: (sample) => {
+        const direction = swipeTurnDirection(sample, this.viewport.clientWidth);
+        if (direction === 0) {
+          this.pager.cancelSwipe();
+          return;
+        }
+        if (direction < 0 && this.backAnchor) {
+          this.pager.cancelSwipe();
+          this.navigateBackward();
+          return;
+        }
+        if (this.pager.finishSwipe(direction)) this.headerVisibility.hide();
+      },
+      cancel: () => this.pager.cancelSwipe(),
     });
 
     for (const eventName of ['dragenter', 'dragover']) {
@@ -368,10 +393,13 @@ export class ChitalkaApp {
 
   private async loadFile(file: File): Promise<void> {
     this.setLoading(`Открываем «${file.name}»…`);
+    await showLoadingOverlay();
     try {
       await this.loadDecoded(await decodeBookFile(file));
     } catch (error) {
       this.showError(error);
+    } finally {
+      hideLoadingOverlay();
     }
   }
 
@@ -935,6 +963,7 @@ export class ChitalkaApp {
   private updateProviderStatus(event: ProviderStatusEvent): void {
     const label = event.provider === 'google' ? this.googleSyncStatus : this.yandexSyncStatus;
     const button = event.provider === 'google' ? this.googleConnect : this.yandexConnect;
+    const providerName = event.provider === 'google' ? 'Google Drive' : 'Яндекс.Диск';
     const statuses: Record<ProviderStatusEvent['status'], string> = {
       disconnected: 'Не подключён',
       connecting: 'Подключаем…',
@@ -945,7 +974,9 @@ export class ChitalkaApp {
     };
     label.textContent = statuses[event.status];
     const connected = event.status === 'connected' || event.status === 'syncing';
-    button.textContent = connected ? 'Отключить' : event.status === 'reconnect' ? 'Переподключить' : 'Подключить';
+    const action = connected ? 'Отключить' : event.status === 'reconnect' ? 'Переподключить' : 'Подключить';
+    button.textContent = action;
+    button.setAttribute('aria-label', `${action} ${providerName}`);
     button.disabled = event.status === 'connecting' || event.status === 'syncing';
     if (
       (event.provider === 'google' && !this.googleSyncConfigured)
@@ -965,10 +996,15 @@ export class ChitalkaApp {
 
   private showToast(message: string): void {
     this.toast.textContent = message;
-    this.toast.hidden = false;
+    this.toastMotion.show();
     if (this.toastTimer) window.clearTimeout(this.toastTimer);
     this.toastTimer = window.setTimeout(() => {
-      this.toast.hidden = true;
+      this.toastMotion.hide();
     }, 5000);
+  }
+
+  private showHeaderHint(): void {
+    if (this.isPreparing || !this.onboarding.claimHeaderHint()) return;
+    this.showToast('Нажмите на текст, чтобы показать меню');
   }
 }

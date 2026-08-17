@@ -1,0 +1,4 @@
+interface:
+  display_name: "Develop Robust UI"
+  short_description: "Build concise, regression-resistant frontend UI"
+  default_prompt: "Use $develop-robust-ui to implement this frontend change with minimal state and focused regression checks."

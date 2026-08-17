@@ -1,4 +1,5 @@
 import { QuotePreviewHighlight, type LocatedSelection } from './reader/quotes';
+import { setMotionOrigin, VisibilityMotion } from './motion';
 import {
   ANNOTATION_COLORS,
   type AnnotationColor,
@@ -91,6 +92,9 @@ export class AnnotationPanelController {
   private currentBookmark?: BookmarkRecord;
   private editing?: AnnotationRecord | 'new-bookmark';
   private readonly colors: ColorPicker;
+  private readonly panelMotion: VisibilityMotion;
+  private readonly backdropMotion: VisibilityMotion;
+  private readonly editorMotion: VisibilityMotion;
   private readonly mobileQuery = typeof window.matchMedia === 'function'
     ? window.matchMedia('(max-width: 640px)')
     : undefined;
@@ -99,6 +103,9 @@ export class AnnotationPanelController {
     private readonly elements: AnnotationPanelElements,
     private readonly actions: AnnotationPanelActions,
   ) {
+    this.panelMotion = new VisibilityMotion(elements.panel);
+    this.backdropMotion = new VisibilityMotion(elements.backdrop);
+    this.editorMotion = new VisibilityMotion(elements.editor);
     this.colors = new ColorPicker(elements.editorColors);
     elements.button.addEventListener('click', this.handleToggle);
     elements.closeButton.addEventListener('click', this.handleClose);
@@ -146,7 +153,7 @@ export class AnnotationPanelController {
   open(tab: 'bookmarks' | 'quotes' = 'bookmarks'): void {
     if (this.isOpen || this.elements.button.hidden) return;
     this.isOpen = true;
-    this.elements.panel.hidden = false;
+    this.panelMotion.show(() => setMotionOrigin(this.elements.panel, this.elements.button));
     this.elements.button.setAttribute('aria-expanded', 'true');
     this.selectTab(tab);
     this.syncMode();
@@ -158,8 +165,8 @@ export class AnnotationPanelController {
     if (!this.isOpen) return;
     this.closeEditor();
     this.isOpen = false;
-    this.elements.panel.hidden = true;
-    this.elements.backdrop.hidden = true;
+    this.panelMotion.hide();
+    this.backdropMotion.hide();
     this.elements.button.setAttribute('aria-expanded', 'false');
     this.actions.openChange(false);
     if (restoreFocus) this.elements.button.focus();
@@ -245,13 +252,13 @@ export class AnnotationPanelController {
     this.elements.editorNote.value = record === 'new-bookmark' ? '' : record.note;
     this.colors.set(record === 'new-bookmark' ? 'purple' : record.color);
     this.elements.editorDelete.hidden = record === 'new-bookmark';
-    this.elements.editor.hidden = false;
+    this.editorMotion.show();
     this.elements.editorNote.focus();
   }
 
   private closeEditor(): void {
     this.editing = undefined;
-    this.elements.editor.hidden = true;
+    this.editorMotion.hide();
   }
 
   private readonly handleToggle = (): void => this.isOpen ? this.close() : this.open();
@@ -304,7 +311,7 @@ export class AnnotationPanelController {
     if (!this.isOpen) return;
     if (event.key === 'Escape') {
       event.preventDefault();
-      if (!this.elements.editor.hidden) this.closeEditor();
+      if (this.editing) this.closeEditor();
       else this.close();
       return;
     }
@@ -328,7 +335,8 @@ export class AnnotationPanelController {
     const mobile = this.mobileQuery?.matches ?? false;
     if (mobile) this.elements.panel.setAttribute('aria-modal', 'true');
     else this.elements.panel.removeAttribute('aria-modal');
-    this.elements.backdrop.hidden = !this.isOpen || !mobile;
+    if (this.isOpen && mobile) this.backdropMotion.show();
+    else this.backdropMotion.hide();
   };
 }
 
@@ -344,10 +352,12 @@ export interface QuoteMenuElements {
 }
 
 export class QuoteMenuController {
+  private isOpen = false;
   private selection?: LocatedSelection;
   private existing?: QuoteRecord;
   private readonly colors: ColorPicker;
   private readonly previewHighlight: QuotePreviewHighlight;
+  private readonly motion: VisibilityMotion;
 
   constructor(
     private readonly elements: QuoteMenuElements,
@@ -358,6 +368,7 @@ export class QuoteMenuController {
     ) => Promise<void> | void,
     private readonly onDelete: (quote: QuoteRecord) => Promise<void> | void,
   ) {
+    this.motion = new VisibilityMotion(elements.form);
     this.previewHighlight = new QuotePreviewHighlight(elements.selectionRoot);
     this.colors = new ColorPicker(elements.colors, (color) => {
       elements.selectionRoot.dataset.quoteSelectionColor = color;
@@ -378,10 +389,11 @@ export class QuoteMenuController {
   }
 
   get opened(): boolean {
-    return !this.elements.form.hidden;
+    return this.isOpen;
   }
 
   open(selection: LocatedSelection, existing?: QuoteRecord): void {
+    this.isOpen = true;
     this.selection = selection;
     this.existing = existing;
     this.elements.preview.textContent = selection.exact.replace(/\s+/gu, ' ').trim();
@@ -389,14 +401,18 @@ export class QuoteMenuController {
     this.colors.set(existing?.color ?? 'purple');
     this.elements.saveButton.textContent = existing ? 'Сохранить изменения' : 'Сохранить цитату';
     this.elements.deleteButton.hidden = !existing;
-    this.elements.form.hidden = false;
-    this.position(selection.range);
+    this.motion.show(() => this.position(selection.range));
     this.previewHighlight.show(selection.range, this.colors.selected);
   }
 
   close(): void {
+    if (!this.isOpen) return;
+    this.isOpen = false;
+    this.motion.hide(() => this.finishClose());
+  }
+
+  private finishClose(): void {
     this.previewHighlight.clear();
-    this.elements.form.hidden = true;
     this.selection = undefined;
     this.existing = undefined;
     document.getSelection()?.removeAllRanges();
@@ -415,6 +431,12 @@ export class QuoteMenuController {
       : Math.max(12, rect.top - estimatedHeight - 10);
     this.elements.form.style.left = `${left}px`;
     this.elements.form.style.top = `${top}px`;
+    const originX = Math.min(width - 20, Math.max(20, rect.left + rect.width / 2 - left));
+    this.elements.form.style.setProperty('--motion-origin-x', `${originX}px`);
+    this.elements.form.style.setProperty(
+      '--motion-origin-y',
+      desiredTop + estimatedHeight < window.innerHeight ? '0px' : '100%',
+    );
   }
 
   private readonly handleSubmit = (event: SubmitEvent): void => {

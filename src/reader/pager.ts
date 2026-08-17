@@ -1,3 +1,5 @@
+import { MOTION_DURATION, MOTION_EASING, prefersReducedMotion } from '../motion';
+
 export type PageMode = 'auto' | 'one' | 'two';
 
 export interface PagerSnapshot {
@@ -40,8 +42,8 @@ interface IdleCallbacks {
   cancelIdleCallback?: (handle: number) => void;
 }
 
-const PAGE_TURN_DURATION = 260;
-const PAGE_TURN_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const PAGE_TURN_DURATION = MOTION_DURATION.page;
+const PAGE_TURN_EASING = MOTION_EASING.move;
 
 export class ReaderPager {
   private currentColumn = 0;
@@ -72,11 +74,13 @@ export class ReaderPager {
   private measurementUsesIdleCallback = false;
   private bookGeneration = 0;
   private pageAnimation?: Animation;
-  private chunkAnimations: Animation[] = [];
-  private transitionLayer?: HTMLElement;
-  private transitionGeneration = 0;
-  private transitioning = false;
+  private viewTransition?: ViewTransition;
+  private viewTransitionGeneration = 0;
+  private transitionUpdatePending = false;
   private pendingSteps = 0;
+  private swiping = false;
+  private swipeBaseOffset = 0;
+  private swipeOffset = 0;
 
   constructor(
     private readonly viewport: HTMLElement,
@@ -176,6 +180,58 @@ export class ReaderPager {
 
   previous(): void {
     this.requestStep(-1);
+  }
+
+  beginSwipe(): void {
+    if (!this.bookRoot || !this.chunks.length || this.transitionUpdatePending) return;
+    this.interruptViewTransition();
+    const offset = this.currentAnimatedOffset();
+    this.cancelPageAnimation();
+    this.swiping = true;
+    this.swipeBaseOffset = offset;
+    this.swipeOffset = offset;
+    this.content.classList.add('is-swiping');
+    this.content.style.transform = `translateX(${offset}px)`;
+  }
+
+  updateSwipe(distance: number): void {
+    if (!this.swiping) return;
+    const atBoundary = (distance > 0 && this.isFirst()) || (distance < 0 && this.isLast());
+    this.swipeOffset = this.swipeBaseOffset + distance * (atBoundary ? 0.28 : 1);
+    this.content.style.transform = `translateX(${this.swipeOffset}px)`;
+  }
+
+  finishSwipe(direction: -1 | 0 | 1): boolean {
+    if (!this.swiping) return false;
+    if (direction === 0) {
+      this.cancelSwipe();
+      return false;
+    }
+    if (this.step(direction)) return true;
+    this.cancelSwipe();
+    return false;
+  }
+
+  cancelSwipe(): void {
+    if (!this.swiping) return;
+    const offset = this.swipeOffset;
+    this.clearSwipeStyles();
+    if (
+      Math.abs(offset) < 0.5
+      || this.prefersReducedMotion()
+      || typeof this.content.animate !== 'function'
+    ) return;
+    const animation = this.content.animate(
+      [
+        { transform: `translateX(${offset}px)` },
+        { transform: 'translateX(0)' },
+      ],
+      { duration: MOTION_DURATION.exit, easing: MOTION_EASING.enter },
+    );
+    this.pageAnimation = animation;
+    void animation.finished.then(() => {
+      if (this.pageAnimation === animation) this.pageAnimation = undefined;
+    }).catch(() => undefined);
   }
 
   first(): void {
@@ -403,11 +459,11 @@ export class ReaderPager {
   }
 
   private requestStep(direction: -1 | 1): void {
-    if (this.transitioning) {
+    if (this.transitionUpdatePending) {
       this.pendingSteps += direction;
-      this.accelerateChunkTransition();
       return;
     }
+    this.interruptViewTransition();
     this.step(direction);
   }
 
@@ -434,9 +490,10 @@ export class ReaderPager {
   }
 
   private flushPendingSteps(): void {
-    while (!this.transitioning && this.pendingSteps !== 0) {
+    while (!this.transitionUpdatePending && this.pendingSteps !== 0) {
       const direction = Math.sign(this.pendingSteps) as -1 | 1;
       this.pendingSteps -= direction;
+      this.interruptViewTransition();
       if (!this.step(direction)) {
         this.pendingSteps = 0;
         break;
@@ -693,6 +750,7 @@ export class ReaderPager {
     const previousLeft = this.viewport.scrollLeft;
     const animatedOffset = this.currentAnimatedOffset();
     this.cancelPageAnimation();
+    this.clearSwipeStyles();
     this.viewport.scrollTo({ left, behavior: 'auto' });
 
     const startOffset = animatedOffset + left - previousLeft;
@@ -723,93 +781,69 @@ export class ReaderPager {
     chunkColumn: number,
     direction: -1 | 1,
   ): void {
-    const generation = ++this.transitionGeneration;
-    const layer = this.createTransitionLayer();
-    this.transitioning = true;
-    this.activeAnchor = undefined;
-    this.mountChunk(chunkIndex);
-    this.performLayout({ chunk: chunkIndex, chunkColumn });
-    this.captureVisibleAnchor();
-    this.moveToCurrent(false);
+    const generation = ++this.viewTransitionGeneration;
+    const update = (): void => {
+      if (generation !== this.viewTransitionGeneration) return;
+      this.activeAnchor = undefined;
+      this.clearSwipeStyles();
+      this.mountChunk(chunkIndex);
+      this.performLayout({ chunk: chunkIndex, chunkColumn });
+      this.captureVisibleAnchor();
+      this.moveToCurrent(false);
+    };
 
-    const distance = Math.max(this.viewport.clientWidth, this.pageExtent * this.pagesPerView);
-    if (
-      !layer
-      || this.prefersReducedMotion()
-      || typeof this.content.animate !== 'function'
-      || typeof layer.animate !== 'function'
-    ) {
-      this.finishChunkTransition(generation);
+    this.cancelPageAnimation();
+    this.viewTransition?.skipTransition();
+    this.viewTransition = undefined;
+    this.transitionUpdatePending = true;
+
+    const canUseViewTransition = !this.prefersReducedMotion()
+      && typeof document.startViewTransition === 'function';
+    if (!canUseViewTransition) {
+      update();
+      this.transitionUpdatePending = false;
+      this.animateChunkEntry(direction);
+      this.flushPendingSteps();
       return;
     }
 
-    const options: KeyframeAnimationOptions = {
-      duration: PAGE_TURN_DURATION,
-      easing: PAGE_TURN_EASING,
-      fill: 'both',
-    };
-    this.chunkAnimations = [
-      layer.animate(
-        [
-          { transform: 'translateX(0)' },
-          { transform: `translateX(${-direction * distance}px)` },
-        ],
-        options,
-      ),
-      this.content.animate(
-        [
-          { transform: `translateX(${direction * distance}px)` },
-          { transform: 'translateX(0)' },
-        ],
-        options,
-      ),
-    ];
-    void Promise.allSettled(this.chunkAnimations.map((animation) => animation.finished))
-      .then(() => this.finishChunkTransition(generation));
+    document.documentElement.dataset.readerDirection = direction > 0 ? 'forward' : 'backward';
+    const transition = document.startViewTransition(update);
+    this.viewTransition = transition;
+    void transition.updateCallbackDone.then(() => {
+      if (generation !== this.viewTransitionGeneration) return;
+      this.transitionUpdatePending = false;
+      this.flushPendingSteps();
+    }).catch(() => {
+      if (generation !== this.viewTransitionGeneration) return;
+      this.transitionUpdatePending = false;
+      this.flushPendingSteps();
+    });
+    void transition.finished.then(() => {
+      if (generation !== this.viewTransitionGeneration) return;
+      this.viewTransition = undefined;
+      delete document.documentElement.dataset.readerDirection;
+    }).catch(() => undefined);
   }
 
-  private createTransitionLayer(): HTMLElement | undefined {
-    if (!this.bookRoot) return undefined;
-    const previousLeft = this.viewport.scrollLeft;
-    const animatedOffset = this.currentAnimatedOffset();
-    this.cancelPageAnimation();
-
-    const layer = document.createElement('div');
-    layer.className = 'reader-transition-layer';
-    layer.setAttribute('aria-hidden', 'true');
-    layer.setAttribute('inert', '');
-    const clone = this.content.cloneNode(true) as HTMLElement;
-    clone.removeAttribute('id');
-    for (const element of Array.from(clone.querySelectorAll<HTMLElement>('[id]'))) {
-      element.removeAttribute('id');
-    }
-    if (Math.abs(animatedOffset) >= 0.5) {
-      clone.style.transform = `translateX(${animatedOffset}px)`;
-    }
-    layer.append(clone);
-    this.viewport.append(layer);
-    layer.scrollLeft = previousLeft;
-    this.transitionLayer = layer;
-    return layer;
-  }
-
-  private finishChunkTransition(generation: number): void {
-    if (generation !== this.transitionGeneration) return;
-    for (const animation of this.chunkAnimations) animation.cancel();
-    this.chunkAnimations = [];
-    this.transitionLayer?.remove();
-    this.transitionLayer = undefined;
-    this.transitioning = false;
-    this.flushPendingSteps();
-  }
-
-  private accelerateChunkTransition(): void {
-    const playbackRate = Math.min(4, 1 + Math.abs(this.pendingSteps) * 0.5);
-    for (const animation of this.chunkAnimations) animation.playbackRate = playbackRate;
+  private animateChunkEntry(direction: -1 | 1): void {
+    if (this.prefersReducedMotion() || typeof this.content.animate !== 'function') return;
+    const distance = Math.min(96, Math.max(40, this.viewport.clientWidth * 0.1));
+    const animation = this.content.animate(
+      [
+        { opacity: 0.78, transform: `translateX(${direction * distance}px)` },
+        { opacity: 1, transform: 'translateX(0)' },
+      ],
+      { duration: MOTION_DURATION.routine, easing: MOTION_EASING.enter },
+    );
+    this.pageAnimation = animation;
+    void animation.finished.then(() => {
+      if (this.pageAnimation === animation) this.pageAnimation = undefined;
+    }).catch(() => undefined);
   }
 
   private currentAnimatedOffset(): number {
-    if (!this.pageAnimation) return 0;
+    if (this.swiping) return this.swipeOffset;
     const transform = getComputedStyle(this.content).transform;
     if (!transform || transform === 'none') return 0;
     const matrixValues = transform.slice(transform.indexOf('(') + 1, transform.lastIndexOf(')'));
@@ -820,8 +854,7 @@ export class ReaderPager {
   }
 
   private prefersReducedMotion(): boolean {
-    return typeof window.matchMedia === 'function'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return prefersReducedMotion();
   }
 
   private cancelPageAnimation(): void {
@@ -830,14 +863,27 @@ export class ReaderPager {
   }
 
   private cancelNavigationAnimations(): void {
-    this.transitionGeneration += 1;
+    this.viewTransitionGeneration += 1;
     this.cancelPageAnimation();
-    for (const animation of this.chunkAnimations) animation.cancel();
-    this.chunkAnimations = [];
-    this.transitionLayer?.remove();
-    this.transitionLayer = undefined;
-    this.transitioning = false;
+    this.interruptViewTransition();
+    this.transitionUpdatePending = false;
     this.pendingSteps = 0;
+    this.clearSwipeStyles();
+    delete document.documentElement.dataset.readerDirection;
+  }
+
+  private interruptViewTransition(): void {
+    this.viewTransition?.skipTransition();
+    this.viewTransition = undefined;
+    delete document.documentElement.dataset.readerDirection;
+  }
+
+  private clearSwipeStyles(): void {
+    this.swiping = false;
+    this.swipeBaseOffset = 0;
+    this.swipeOffset = 0;
+    this.content.classList.remove('is-swiping');
+    this.content.style.removeProperty('transform');
   }
 
   private initialWordsPerPage(geometry: LayoutGeometry): number {

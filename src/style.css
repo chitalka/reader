@@ -4,7 +4,7 @@
   --surface: rgba(255, 253, 248, 0.9);
   --surface-solid: #fffdf8;
   --text: #262626;
-  --muted: #737373;
+  --muted: #686868;
   --line: rgba(73, 63, 48, 0.16);
   --accent: #7c3aed;
   --accent-strong: #5b21b6;
@@ -18,6 +18,12 @@
   --header-height: 72px;
   --reader-panel-gap: 12px;
   --reader-edge-gap: calc(var(--header-height) + var(--reader-panel-gap));
+  --motion-immediate: 140ms;
+  --motion-exit: 160ms;
+  --motion-routine: 200ms;
+  --motion-page: 260ms;
+  --ease-enter: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
 }
@@ -71,7 +77,7 @@ button,
 }
 
 button:focus-visible,
-.open-button:focus-visible,
+#book-file:focus-visible + .open-button,
 .settings-close:focus-visible,
 .panel-close:focus-visible,
 .setting-step:focus-visible,
@@ -118,9 +124,8 @@ button:disabled {
   background: color-mix(in srgb, var(--surface-solid) 82%, transparent);
   backdrop-filter: blur(18px);
   transition:
-    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 180ms ease-out;
-  will-change: transform;
+    transform var(--motion-routine) var(--ease-enter),
+    opacity var(--motion-routine) var(--ease-enter);
 }
 
 #app[data-header-visibility="hidden"] .app-header {
@@ -130,28 +135,21 @@ button:disabled {
 }
 
 .brand {
-  display: inline-flex;
-  gap: 10px;
-  align-items: center;
-  width: fit-content;
-  color: var(--text);
-  font-size: 18px;
-  font-weight: 750;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 14px;
   text-decoration: none;
-  letter-spacing: -0.02em;
 }
 
-.brand-mark {
-  display: grid;
-  width: 34px;
-  height: 38px;
-  place-items: center;
-  color: #fff;
-  background: var(--accent);
-  border-radius: 5px 12px 12px 5px;
-  box-shadow: 4px 4px 0 color-mix(in srgb, var(--accent) 22%, transparent);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 21px;
+.brand-mascot {
+  display: block;
+  width: 60px;
+  height: 60px;
+  max-width: none;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 .book-heading {
@@ -196,7 +194,11 @@ button:disabled {
   color: var(--text);
   background: var(--surface-solid);
   cursor: pointer;
-  transition: border-color 150ms ease, background 150ms ease, color 150ms ease, transform 150ms ease;
+  transition:
+    border-color var(--motion-immediate) ease,
+    background var(--motion-immediate) ease,
+    color var(--motion-immediate) ease,
+    transform var(--motion-immediate) var(--ease-enter);
 }
 
 .icon-button:hover,
@@ -292,6 +294,87 @@ button:disabled {
   display: none;
 }
 
+.toc-panel,
+.settings-panel,
+.annotations-panel,
+.quote-menu,
+.annotation-editor,
+.toast {
+  opacity: 1;
+  transform: translateX(0) translateY(0) scale(1);
+  transition:
+    transform var(--motion-routine) var(--ease-enter),
+    opacity var(--motion-routine) var(--ease-enter);
+  transform-origin:
+    var(--motion-origin-x, calc(100% - 32px))
+    var(--motion-origin-y, 0);
+}
+
+.toc-panel,
+.settings-panel,
+.annotations-panel {
+  --motion-closed-transform: translateY(-8px) scale(0.98);
+}
+
+.quote-menu {
+  --motion-closed-transform: translateY(6px) scale(0.98);
+}
+
+.annotation-editor {
+  --motion-closed-transform: translateX(12px);
+}
+
+.toast {
+  --motion-closed-transform: translateY(8px) scale(0.98);
+}
+
+.toc-panel[data-motion-state="opening"],
+.toc-panel[data-motion-state="closing"],
+.settings-panel[data-motion-state="opening"],
+.settings-panel[data-motion-state="closing"],
+.annotations-panel[data-motion-state="opening"],
+.annotations-panel[data-motion-state="closing"],
+.quote-menu[data-motion-state="opening"],
+.quote-menu[data-motion-state="closing"],
+.annotation-editor[data-motion-state="opening"],
+.annotation-editor[data-motion-state="closing"],
+.toast[data-motion-state="opening"],
+.toast[data-motion-state="closing"] {
+  opacity: 0;
+  transform: var(--motion-closed-transform);
+  will-change: transform, opacity;
+}
+
+.toc-panel[data-motion-state="closing"],
+.settings-panel[data-motion-state="closing"],
+.annotations-panel[data-motion-state="closing"],
+.quote-menu[data-motion-state="closing"],
+.annotation-editor[data-motion-state="closing"],
+.toast[data-motion-state="closing"] {
+  transition-duration: var(--motion-exit);
+  pointer-events: none;
+}
+
+.settings-backdrop,
+.panel-backdrop {
+  opacity: 1;
+  transition: opacity var(--motion-routine) var(--ease-enter);
+}
+
+.settings-backdrop[data-motion-state="opening"],
+.settings-backdrop[data-motion-state="closing"],
+.panel-backdrop[data-motion-state="opening"],
+.panel-backdrop[data-motion-state="closing"] {
+  opacity: 0;
+  will-change: opacity;
+}
+
+.settings-backdrop[data-motion-state="closing"],
+.panel-backdrop[data-motion-state="closing"] {
+  transition-duration: var(--motion-exit);
+  pointer-events: none;
+}
+
 .toc-panel {
   position: fixed;
   z-index: 40;
@@ -306,10 +389,8 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 18px;
   color: var(--text);
-  background: color-mix(in srgb, var(--surface-solid) 96%, transparent);
+  background: var(--surface-solid);
   box-shadow: var(--popover-shadow);
-  animation: settings-popover-in 160ms ease-out;
-  backdrop-filter: blur(20px);
 }
 
 .toc-panel-header {
@@ -408,10 +489,8 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 18px;
   color: var(--text);
-  background: color-mix(in srgb, var(--surface-solid) 96%, transparent);
+  background: var(--surface-solid);
   box-shadow: var(--popover-shadow);
-  animation: settings-popover-in 160ms ease-out;
-  backdrop-filter: blur(20px);
 }
 
 .annotations-panel {
@@ -428,10 +507,8 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 18px;
   color: var(--text);
-  background: color-mix(in srgb, var(--surface-solid) 96%, transparent);
+  background: var(--surface-solid);
   box-shadow: var(--popover-shadow);
-  animation: settings-popover-in 160ms ease-out;
-  backdrop-filter: blur(20px);
 }
 
 .annotations-panel-header {
@@ -795,6 +872,12 @@ button:disabled {
   line-height: 1.4;
 }
 
+.sync-help {
+  display: grid;
+  gap: 4px;
+  padding-left: 18px;
+}
+
 .sync-provider {
   display: flex;
   gap: 12px;
@@ -937,7 +1020,10 @@ button:disabled {
   font-size: 13px;
   font-weight: 700;
   text-align: center;
-  transition: color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+  transition:
+    color var(--motion-immediate) ease,
+    background var(--motion-immediate) ease,
+    box-shadow var(--motion-immediate) ease;
 }
 
 .setting-option:hover span {
@@ -953,13 +1039,6 @@ button:disabled {
 .setting-option input:focus-visible + span {
   outline: 3px solid color-mix(in srgb, var(--focus) 75%, transparent);
   outline-offset: 3px;
-}
-
-@keyframes settings-popover-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.98);
-  }
 }
 
 .reader-shell {
@@ -995,26 +1074,9 @@ button:disabled {
   color: var(--accent-strong);
 }
 
-.reader-status.is-error .loader {
-  display: none;
-}
-
 .reader-status p {
   max-width: 34rem;
   margin: 0;
-}
-
-.loader {
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--line);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 750ms linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(1turn); }
 }
 
 .book-viewport {
@@ -1025,14 +1087,48 @@ button:disabled {
   overflow: hidden;
   overscroll-behavior: none;
   touch-action: pan-y;
+  contain: paint;
+  view-transition-name: reader-page;
 }
 
-.reader-transition-layer {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
+::view-transition-old(reader-page),
+::view-transition-new(reader-page) {
+  animation-duration: var(--motion-page);
+  animation-fill-mode: both;
+  animation-timing-function: var(--ease-move);
+  mix-blend-mode: normal;
+}
+
+:root[data-reader-direction="forward"]::view-transition-old(reader-page) {
+  animation-name: reader-page-old-forward;
+}
+
+:root[data-reader-direction="forward"]::view-transition-new(reader-page) {
+  animation-name: reader-page-new-forward;
+}
+
+:root[data-reader-direction="backward"]::view-transition-old(reader-page) {
+  animation-name: reader-page-old-backward;
+}
+
+:root[data-reader-direction="backward"]::view-transition-new(reader-page) {
+  animation-name: reader-page-new-backward;
+}
+
+@keyframes reader-page-old-forward {
+  to { transform: translateX(-100%); }
+}
+
+@keyframes reader-page-new-forward {
+  from { transform: translateX(100%); }
+}
+
+@keyframes reader-page-old-backward {
+  to { transform: translateX(100%); }
+}
+
+@keyframes reader-page-new-backward {
+  from { transform: translateX(-100%); }
 }
 
 .book-content {
@@ -1049,6 +1145,10 @@ button:disabled {
   font-size: 18px;
   line-height: 1.62;
   text-rendering: optimizeLegibility;
+}
+
+.book-content.is-swiping {
+  will-change: transform;
 }
 
 .book {
@@ -1472,7 +1572,6 @@ progress::-moz-progress-bar {
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
-  .brand > span:last-child,
   .book-heading span {
     display: none;
   }
@@ -1525,8 +1624,6 @@ progress::-moz-progress-bar {
     inset: var(--header-height) 0 0;
     display: block;
     background: rgba(22, 19, 16, 0.42);
-    animation: settings-backdrop-in 160ms ease-out;
-    backdrop-filter: blur(3px);
   }
 
   .panel-backdrop {
@@ -1535,8 +1632,6 @@ progress::-moz-progress-bar {
     inset: var(--header-height) 0 0;
     display: block;
     background: rgba(22, 19, 16, 0.42);
-    animation: settings-backdrop-in 160ms ease-out;
-    backdrop-filter: blur(3px);
   }
 
   .settings-panel {
@@ -1551,7 +1646,8 @@ progress::-moz-progress-bar {
     border-bottom: 0;
     border-left: 0;
     border-radius: 24px 24px 0 0;
-    animation-name: settings-sheet-in;
+    --motion-closed-transform: translateY(28px);
+    transform-origin: center bottom;
   }
 
   .toc-panel {
@@ -1566,7 +1662,8 @@ progress::-moz-progress-bar {
     border-bottom: 0;
     border-left: 0;
     border-radius: 24px 24px 0 0;
-    animation-name: settings-sheet-in;
+    --motion-closed-transform: translateY(28px);
+    transform-origin: center bottom;
   }
 
   .annotations-panel {
@@ -1581,7 +1678,8 @@ progress::-moz-progress-bar {
     border-bottom: 0;
     border-left: 0;
     border-radius: 24px 24px 0 0;
-    animation-name: settings-sheet-in;
+    --motion-closed-transform: translateY(28px);
+    transform-origin: center bottom;
   }
 
   .quote-menu {
@@ -1590,14 +1688,8 @@ progress::-moz-progress-bar {
     left: 12px !important;
     top: auto !important;
     width: auto;
-  }
-
-  @keyframes settings-sheet-in {
-    from { transform: translateY(28px); opacity: 0; }
-  }
-
-  @keyframes settings-backdrop-in {
-    from { opacity: 0; }
+    --motion-closed-transform: translateY(18px);
+    transform-origin: center bottom;
   }
 }
 
@@ -1608,9 +1700,14 @@ progress::-moz-progress-bar {
     --reader-panel-gap: 6px;
   }
 
-  .brand-mark {
-    width: 31px;
-    height: 34px;
+  .brand {
+    width: 44px;
+    height: 44px;
+  }
+
+  .brand-mascot {
+    width: 54px;
+    height: 54px;
   }
 
   .book-heading strong {
@@ -1635,14 +1732,60 @@ progress::-moz-progress-bar {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+  .app-header {
+    transition: opacity 120ms var(--ease-enter);
   }
+
+  #app[data-header-visibility="hidden"] .app-header {
+    transform: none;
+  }
+
+  .toc-panel,
+  .settings-panel,
+  .annotations-panel,
+  .quote-menu,
+  .annotation-editor,
+  .toast,
+  .settings-backdrop,
+  .panel-backdrop {
+    transition-duration: 120ms;
+    transition-property: opacity;
+  }
+
+  .toc-panel[data-motion-state="opening"],
+  .toc-panel[data-motion-state="closing"],
+  .settings-panel[data-motion-state="opening"],
+  .settings-panel[data-motion-state="closing"],
+  .annotations-panel[data-motion-state="opening"],
+  .annotations-panel[data-motion-state="closing"],
+  .quote-menu[data-motion-state="opening"],
+  .quote-menu[data-motion-state="closing"],
+  .annotation-editor[data-motion-state="opening"],
+  .annotation-editor[data-motion-state="closing"],
+  .toast[data-motion-state="opening"],
+  .toast[data-motion-state="closing"] {
+    transform: none;
+  }
+
+  ::view-transition-old(reader-page) {
+    animation-duration: 120ms;
+    animation-name: reader-fade-out !important;
+    animation-timing-function: var(--ease-enter);
+  }
+
+  ::view-transition-new(reader-page) {
+    animation-duration: 120ms;
+    animation-name: reader-fade-in !important;
+    animation-timing-function: var(--ease-enter);
+  }
+}
+
+@keyframes reader-fade-out {
+  to { opacity: 0; }
+}
+
+@keyframes reader-fade-in {
+  from { opacity: 0; }
 }
 
 @media print {

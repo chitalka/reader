@@ -6,7 +6,10 @@ export interface TouchPoint {
 
 const DEFAULT_IDLE_DELAY = 5_000;
 const TAP_DISTANCE = 14;
-const SWIPE_DISTANCE = 48;
+const SWIPE_INTENT_DISTANCE = 8;
+const SWIPE_MIN_DISTANCE = 48;
+const SWIPE_DISTANCE_RATIO = 0.18;
+const SWIPE_MIN_VELOCITY = 0.35;
 
 export function isShortTap(start: TouchPoint | undefined, end: TouchPoint): boolean {
   if (!start || start.pointerId !== end.pointerId) return false;
@@ -103,36 +106,140 @@ export function bindMouseReadingClick(target: HTMLElement, onClick: () => void):
   };
 }
 
-export function bindTouchSwipe(target: HTMLElement, onSwipe: (distance: number) => void): () => void {
-  let start: TouchPoint | undefined;
+export interface TouchSwipeSample {
+  distance: number;
+  velocity: number;
+}
+
+export interface TouchSwipeHandlers {
+  start(): void;
+  move(distance: number): void;
+  end(sample: TouchSwipeSample): void;
+  cancel(): void;
+}
+
+interface TouchSwipeSession extends TouchPoint {
+  active: boolean;
+  lastTime: number;
+  lastVelocity: number;
+  lastX: number;
+}
+
+export function swipeTurnDirection(
+  sample: TouchSwipeSample,
+  viewportWidth: number,
+): -1 | 0 | 1 {
+  const requiredDistance = Math.max(
+    SWIPE_MIN_DISTANCE,
+    Math.min(96, viewportWidth * SWIPE_DISTANCE_RATIO),
+  );
+  if (
+    Math.abs(sample.distance) < requiredDistance
+    && Math.abs(sample.velocity) < SWIPE_MIN_VELOCITY
+  ) return 0;
+  const movement = Math.abs(sample.velocity) >= SWIPE_MIN_VELOCITY
+    ? sample.velocity
+    : sample.distance;
+  return movement < 0 ? 1 : -1;
+}
+
+export function bindTouchSwipe(
+  target: HTMLElement,
+  handlers: TouchSwipeHandlers,
+): () => void {
+  let session: TouchSwipeSession | undefined;
+
+  const release = (pointerId: number): void => {
+    if (typeof target.hasPointerCapture === 'function' && target.hasPointerCapture(pointerId)) {
+      target.releasePointerCapture(pointerId);
+    }
+  };
+
+  const activate = (event: PointerEvent): boolean => {
+    if (!session || session.active) return Boolean(session?.active);
+    const distanceX = event.clientX - session.x;
+    const distanceY = event.clientY - session.y;
+    if (Math.hypot(distanceX, distanceY) < SWIPE_INTENT_DISTANCE) return false;
+    if (Math.abs(distanceY) >= Math.abs(distanceX)) {
+      session = undefined;
+      return false;
+    }
+    if (hasTextSelection(target.ownerDocument)) {
+      session = undefined;
+      return false;
+    }
+    session.active = true;
+    target.setPointerCapture?.(event.pointerId);
+    handlers.start();
+    return true;
+  };
 
   const handlePointerDown = (event: PointerEvent) => {
-    if (!event.isPrimary || event.pointerType === 'mouse') return;
-    start = {
+    if (
+      !event.isPrimary
+      || event.pointerType === 'mouse'
+      || isToggleBlockedTarget(event.target)
+      || hasTextSelection(target.ownerDocument)
+    ) return;
+    session = {
       pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
+      active: false,
+      lastTime: event.timeStamp,
+      lastVelocity: 0,
+      lastX: event.clientX,
     };
   };
+
+  const handlePointerMove = (event: PointerEvent) => {
+    if (!session || session.pointerId !== event.pointerId || !event.isPrimary) return;
+    if (!activate(event) || !session) return;
+    event.preventDefault();
+    const elapsed = event.timeStamp - session.lastTime;
+    if (elapsed > 0) session.lastVelocity = (event.clientX - session.lastX) / elapsed;
+    session.lastTime = event.timeStamp;
+    session.lastX = event.clientX;
+    handlers.move(event.clientX - session.x);
+  };
+
   const handlePointerUp = (event: PointerEvent) => {
     if (!event.isPrimary || event.pointerType === 'mouse') return;
-    if (!start || start.pointerId !== event.pointerId) return;
-    const distance = event.clientX - start.x;
-    start = undefined;
-    if (Math.abs(distance) >= SWIPE_DISTANCE) onSwipe(distance);
+    if (!session || session.pointerId !== event.pointerId) return;
+    const distance = event.clientX - session.x;
+    if (!session.active) activate(event);
+    if (session?.active) {
+      const elapsed = event.timeStamp - session.lastTime;
+      const velocity = elapsed > 0
+        ? (event.clientX - session.lastX) / elapsed
+        : session.lastVelocity;
+      handlers.move(distance);
+      handlers.end({ distance, velocity });
+    }
+    release(event.pointerId);
+    session = undefined;
   };
-  const handlePointerCancel = () => {
-    start = undefined;
+
+  const handlePointerCancel = (event: PointerEvent) => {
+    if (!session || session.pointerId !== event.pointerId) return;
+    if (session.active) handlers.cancel();
+    release(event.pointerId);
+    session = undefined;
   };
 
   target.addEventListener('pointerdown', handlePointerDown);
+  target.addEventListener('pointermove', handlePointerMove);
   target.addEventListener('pointerup', handlePointerUp);
   target.addEventListener('pointercancel', handlePointerCancel);
 
   return () => {
     target.removeEventListener('pointerdown', handlePointerDown);
+    target.removeEventListener('pointermove', handlePointerMove);
     target.removeEventListener('pointerup', handlePointerUp);
     target.removeEventListener('pointercancel', handlePointerCancel);
+    if (session?.active) handlers.cancel();
+    if (session) release(session.pointerId);
+    session = undefined;
   };
 }
 
@@ -144,6 +251,7 @@ export class HeaderVisibilityController {
     private readonly root: HTMLElement,
     private readonly header: HTMLElement,
     private readonly idleDelay = DEFAULT_IDLE_DELAY,
+    private readonly onIdleHide?: () => void,
   ) {}
 
   reveal(): void {
@@ -185,6 +293,7 @@ export class HeaderVisibilityController {
     this.hideTimer = window.setTimeout(() => {
       this.hideTimer = undefined;
       this.setHidden(true);
+      this.onIdleHide?.();
     }, this.idleDelay);
   }
 

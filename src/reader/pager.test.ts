@@ -127,6 +127,7 @@ describe('ReaderPager', () => {
 
   afterEach(() => {
     pager.destroy();
+    Reflect.deleteProperty(document, 'startViewTransition');
     if (animateDescriptor) {
       Object.defineProperty(HTMLElement.prototype, 'animate', animateDescriptor);
     } else {
@@ -372,47 +373,108 @@ describe('ReaderPager', () => {
     expect(pager.getSnapshot()).toMatchObject({ chunkIndex: 0, anchor: 'first' });
   });
 
-  it('queues rapid turns while a chapter transition is running', async () => {
+  it('keeps rapid chapter turns on the latest requested destination', async () => {
     Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 434 });
-    const pendingAnimations: Array<{
-      animation: Animation;
-      finish: () => void;
-    }> = [];
-    Object.defineProperty(HTMLElement.prototype, 'animate', {
+    let firstUpdate: (() => void) | undefined;
+    let resolveFirstUpdate = (): void => undefined;
+    const skipped: Array<ReturnType<typeof vi.fn>> = [];
+    let transitionCount = 0;
+    Object.defineProperty(document, 'startViewTransition', {
       configurable: true,
-      value: vi.fn(() => {
-        let finish = (): void => undefined;
-        const finished = new Promise<void>((resolve) => {
-          finish = resolve;
-        });
-        const animation = {
-          cancel: vi.fn(),
-          finished,
-          playbackRate: 1,
-        } as unknown as Animation;
-        pendingAnimations.push({ animation, finish });
-        return animation;
+      value: vi.fn((update: ViewTransitionUpdateCallback) => {
+        const skipTransition = vi.fn();
+        skipped.push(skipTransition);
+        transitionCount += 1;
+        if (transitionCount === 1) {
+          firstUpdate = () => { void update(); };
+          const updateCallbackDone = new Promise<void>((resolve) => {
+            resolveFirstUpdate = resolve;
+          });
+          return {
+            finished: new Promise<void>(() => undefined),
+            ready: Promise.resolve(),
+            types: new Set<string>(),
+            updateCallbackDone,
+            skipTransition,
+          } as unknown as ViewTransition;
+        }
+        void update();
+        return {
+          finished: new Promise<void>(() => undefined),
+          ready: Promise.resolve(),
+          types: new Set<string>(),
+          updateCallbackDone: Promise.resolve(),
+          skipTransition,
+        } as unknown as ViewTransition;
       }),
     });
     const first = chunk(anchor('first', 0, 80));
     const second = chunk(anchor('second', 0, 80));
     const third = chunk(anchor('third', 0, 80));
-    await pager.setBook(chunkedBook(first, second, third));
+    const fourth = chunk(anchor('fourth', 0, 80));
+    await pager.setBook(chunkedBook(first, second, third, fourth));
 
     pager.next();
+    pager.next();
+    pager.next();
+
+    expect(pager.getSnapshot().chunkIndex).toBe(0);
+    expect(firstUpdate).toBeTypeOf('function');
+
+    firstUpdate?.();
+    resolveFirstUpdate();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(pager.getSnapshot().chunkIndex).toBe(3);
+    expect(fourth.isConnected).toBe(true);
+    expect(skipped.some((skip) => skip.mock.calls.length > 0)).toBe(true);
+
+    pager.previous();
+    await Promise.resolve();
+    expect(pager.getSnapshot().chunkIndex).toBe(2);
+    expect(third.isConnected).toBe(true);
+
+    Reflect.deleteProperty(document, 'startViewTransition');
+  });
+
+  it('uses a lightweight chapter fallback without cloning the mounted chapter', async () => {
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 434 });
+    const first = chunk(anchor('first', 0, 80));
+    const second = chunk(anchor('second', 0, 80));
+    const clone = vi.spyOn(content, 'cloneNode');
+    await pager.setBook(chunkedBook(first, second));
+
     pager.next();
 
     expect(pager.getSnapshot().chunkIndex).toBe(1);
-    expect(pendingAnimations).toHaveLength(2);
-    expect(pendingAnimations.every(({ animation }) => animation.playbackRate === 1.5)).toBe(true);
+    expect(second.isConnected).toBe(true);
+    expect(clone).not.toHaveBeenCalled();
+  });
 
-    pendingAnimations.slice(0, 2).forEach(({ finish }) => finish());
-    await Promise.resolve();
-    await Promise.resolve();
+  it('tracks and settles a touch swipe without changing semantic state mid-drag', async () => {
+    await pager.setBook(document.createDocumentFragment());
+    const animate = vi.fn(() => ({
+      cancel: vi.fn(),
+      finished: Promise.resolve(),
+    }) as unknown as Animation);
+    Object.defineProperty(content, 'animate', { configurable: true, value: animate });
 
-    expect(pager.getSnapshot().chunkIndex).toBe(2);
-    expect(third.isConnected).toBe(true);
-    expect(pendingAnimations).toHaveLength(4);
+    pager.beginSwipe();
+    pager.updateSwipe(-80);
+
+    expect(pager.getSnapshot().currentPage).toBe(1);
+    expect(content.style.transform).toBe('translateX(-80px)');
+    expect(pager.finishSwipe(1)).toBe(true);
+    expect(pager.getSnapshot().currentPage).toBe(3);
+    expect(content.style.transform).toBe('');
+
+    pager.beginSwipe();
+    pager.updateSwipe(20);
+    pager.cancelSwipe();
+    expect(animate).toHaveBeenCalled();
   });
 
   it('jumps to a footnote in a detached chunk and returns to the text anchor', async () => {

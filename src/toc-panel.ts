@@ -1,4 +1,5 @@
 import type { BookTocItem } from './book/model';
+import { setMotionOrigin, VisibilityMotion } from './motion';
 
 export interface TocPanelElements {
   button: HTMLButtonElement;
@@ -12,6 +13,8 @@ const MOBILE_TOC_QUERY = '(max-width: 640px)';
 
 export class TocPanelController {
   private isOpen = false;
+  private readonly panelMotion: VisibilityMotion;
+  private readonly backdropMotion: VisibilityMotion;
   private readonly mobileQuery = typeof window.matchMedia === 'function'
     ? window.matchMedia(MOBILE_TOC_QUERY)
     : undefined;
@@ -21,6 +24,8 @@ export class TocPanelController {
     private readonly onSelect: (target: string) => void,
     private readonly onOpenChange: (isOpen: boolean) => void = () => undefined,
   ) {
+    this.panelMotion = new VisibilityMotion(elements.panel);
+    this.backdropMotion = new VisibilityMotion(elements.backdrop);
     elements.button.addEventListener('click', this.handleToggle);
     elements.closeButton.addEventListener('click', this.handleClose);
     elements.backdrop.addEventListener('click', this.handleBackdropClick);
@@ -43,6 +48,8 @@ export class TocPanelController {
     document.removeEventListener('pointerdown', this.handlePointerDown);
     document.removeEventListener('keydown', this.handleKeydown);
     this.mobileQuery?.removeEventListener('change', this.handleMediaChange);
+    this.panelMotion.destroy();
+    this.backdropMotion.destroy();
   }
 
   setItems(items: BookTocItem[]): void {
@@ -64,7 +71,7 @@ export class TocPanelController {
   open(): void {
     if (this.isOpen || this.elements.button.hidden) return;
     this.isOpen = true;
-    this.elements.panel.hidden = false;
+    this.panelMotion.show(() => setMotionOrigin(this.elements.panel, this.elements.button));
     this.elements.button.setAttribute('aria-expanded', 'true');
     document.body.classList.add('toc-open');
     this.syncMode();
@@ -77,8 +84,8 @@ export class TocPanelController {
   close(restoreFocus = true): void {
     if (!this.isOpen) return;
     this.isOpen = false;
-    this.elements.panel.hidden = true;
-    this.elements.backdrop.hidden = true;
+    this.panelMotion.hide();
+    this.backdropMotion.hide();
     this.elements.button.setAttribute('aria-expanded', 'false');
     document.body.classList.remove('toc-open');
     this.onOpenChange(false);
@@ -172,6 +179,7 @@ export class TocPanelController {
     const isMobile = this.mobileQuery?.matches ?? false;
     if (isMobile) this.elements.panel.setAttribute('aria-modal', 'true');
     else this.elements.panel.removeAttribute('aria-modal');
-    this.elements.backdrop.hidden = !this.isOpen || !isMobile;
+    if (this.isOpen && isMobile) this.backdropMotion.show();
+    else this.backdropMotion.hide();
   }
 }

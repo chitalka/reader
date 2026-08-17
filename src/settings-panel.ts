@@ -1,3 +1,5 @@
+import { setMotionOrigin, VisibilityMotion } from './motion';
+
 export interface SettingsPanelElements {
   button: HTMLButtonElement;
   panel: HTMLElement;
@@ -9,6 +11,8 @@ const MOBILE_SETTINGS_QUERY = '(max-width: 640px)';
 
 export class SettingsPanelController {
   private isOpen = false;
+  private readonly panelMotion: VisibilityMotion;
+  private readonly backdropMotion: VisibilityMotion;
   private readonly mobileQuery = typeof window.matchMedia === 'function'
     ? window.matchMedia(MOBILE_SETTINGS_QUERY)
     : undefined;
@@ -17,6 +21,8 @@ export class SettingsPanelController {
     private readonly elements: SettingsPanelElements,
     private readonly onOpenChange: (isOpen: boolean) => void = () => undefined,
   ) {
+    this.panelMotion = new VisibilityMotion(elements.panel);
+    this.backdropMotion = new VisibilityMotion(elements.backdrop);
     elements.button.addEventListener('click', this.handleToggle);
     elements.closeButton.addEventListener('click', this.handleClose);
     elements.backdrop.addEventListener('click', this.handleBackdropClick);
@@ -37,12 +43,14 @@ export class SettingsPanelController {
     document.removeEventListener('pointerdown', this.handlePointerDown);
     document.removeEventListener('keydown', this.handleKeydown);
     this.mobileQuery?.removeEventListener('change', this.handleMediaChange);
+    this.panelMotion.destroy();
+    this.backdropMotion.destroy();
   }
 
   open(): void {
     if (this.isOpen) return;
     this.isOpen = true;
-    this.elements.panel.hidden = false;
+    this.panelMotion.show(() => setMotionOrigin(this.elements.panel, this.elements.button));
     this.elements.button.setAttribute('aria-expanded', 'true');
     document.body.classList.add('settings-open');
     this.syncMode();
@@ -53,8 +61,8 @@ export class SettingsPanelController {
   close(restoreFocus = true): void {
     if (!this.isOpen) return;
     this.isOpen = false;
-    this.elements.panel.hidden = true;
-    this.elements.backdrop.hidden = true;
+    this.panelMotion.hide();
+    this.backdropMotion.hide();
     this.elements.button.setAttribute('aria-expanded', 'false');
     document.body.classList.remove('settings-open');
     this.onOpenChange(false);
@@ -117,6 +125,7 @@ export class SettingsPanelController {
     const isMobile = this.mobileQuery?.matches ?? false;
     if (isMobile) this.elements.panel.setAttribute('aria-modal', 'true');
     else this.elements.panel.removeAttribute('aria-modal');
-    this.elements.backdrop.hidden = !this.isOpen || !isMobile;
+    if (this.isOpen && isMobile) this.backdropMotion.show();
+    else this.backdropMotion.hide();
   }
 }

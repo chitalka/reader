@@ -5,12 +5,16 @@ import {
   bindTouchSwipe,
   bindTouchTap,
   isShortTap,
+  swipeTurnDirection,
 } from './header-visibility';
 
 function dispatchPointer(
   target: Element,
-  type: 'pointerdown' | 'pointerup' | 'pointercancel',
-  init: Partial<Pick<PointerEvent, 'clientX' | 'clientY' | 'isPrimary' | 'pointerId' | 'pointerType'>> = {},
+  type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel',
+  init: Partial<Pick<
+    PointerEvent,
+    'clientX' | 'clientY' | 'isPrimary' | 'pointerId' | 'pointerType' | 'timeStamp'
+  >> = {},
 ): void {
   const event = new MouseEvent(type, {
     bubbles: true,
@@ -21,6 +25,7 @@ function dispatchPointer(
     isPrimary: { value: init.isPrimary ?? true },
     pointerId: { value: init.pointerId ?? 1 },
     pointerType: { value: init.pointerType ?? 'touch' },
+    timeStamp: { value: init.timeStamp ?? performance.now() },
   });
   target.dispatchEvent(event);
 }
@@ -53,6 +58,24 @@ describe('HeaderVisibilityController', () => {
     expect(root.dataset.headerVisibility).toBe('hidden');
     expect(header.getAttribute('aria-hidden')).toBe('true');
     expect(header.hasAttribute('inert')).toBe(true);
+  });
+
+  it('reports automatic idle hides but not explicit reading actions', () => {
+    const onIdleHide = vi.fn();
+    controller.destroy();
+    controller = new HeaderVisibilityController(root, header, 5_000, onIdleHide);
+
+    controller.reveal();
+    controller.hide();
+    expect(onIdleHide).not.toHaveBeenCalled();
+
+    controller.reveal();
+    vi.advanceTimersByTime(5_000);
+    expect(onIdleHide).toHaveBeenCalledTimes(1);
+
+    controller.reveal();
+    vi.advanceTimersByTime(5_000);
+    expect(onIdleHide).toHaveBeenCalledTimes(2);
   });
 
   it('reveals the header and restarts the inactivity timer', () => {
@@ -254,32 +277,67 @@ describe('bindMouseReadingClick', () => {
 });
 
 describe('bindTouchSwipe', () => {
-  it('handles horizontal touch swipes in both directions', () => {
+  it('reports live horizontal touch movement and release velocity', () => {
     const reader = document.createElement('main');
-    const onSwipe = vi.fn();
-    const unbind = bindTouchSwipe(reader, onSwipe);
+    const handlers = {
+      start: vi.fn(),
+      move: vi.fn(),
+      end: vi.fn(),
+      cancel: vi.fn(),
+    };
+    const unbind = bindTouchSwipe(reader, handlers);
 
-    dispatchPointer(reader, 'pointerdown', { clientX: 100 });
-    dispatchPointer(reader, 'pointerup', { clientX: 40 });
-    dispatchPointer(reader, 'pointerdown', { clientX: 40 });
-    dispatchPointer(reader, 'pointerup', { clientX: 100 });
-    expect(onSwipe).toHaveBeenNthCalledWith(1, -60);
-    expect(onSwipe).toHaveBeenNthCalledWith(2, 60);
+    dispatchPointer(reader, 'pointerdown', { clientX: 100, timeStamp: 0 });
+    dispatchPointer(reader, 'pointermove', { clientX: 70, timeStamp: 50 });
+    dispatchPointer(reader, 'pointerup', { clientX: 40, timeStamp: 100 });
+
+    expect(handlers.start).toHaveBeenCalledTimes(1);
+    expect(handlers.move).toHaveBeenNthCalledWith(1, -30);
+    expect(handlers.move).toHaveBeenNthCalledWith(2, -60);
+    expect(handlers.end).toHaveBeenCalledWith({ distance: -60, velocity: -0.6 });
+    expect(handlers.cancel).not.toHaveBeenCalled();
 
     unbind();
   });
 
-  it('ignores mouse drags and short touch movement', () => {
+  it('cancels an active gesture on pointer cancellation', () => {
     const reader = document.createElement('main');
-    const onSwipe = vi.fn();
-    const unbind = bindTouchSwipe(reader, onSwipe);
+    const handlers = {
+      start: vi.fn(), move: vi.fn(), end: vi.fn(), cancel: vi.fn(),
+    };
+    const unbind = bindTouchSwipe(reader, handlers);
+
+    dispatchPointer(reader, 'pointerdown', { clientX: 100 });
+    dispatchPointer(reader, 'pointermove', { clientX: 70 });
+    dispatchPointer(reader, 'pointercancel', { clientX: 70 });
+
+    expect(handlers.start).toHaveBeenCalledTimes(1);
+    expect(handlers.cancel).toHaveBeenCalledTimes(1);
+    expect(handlers.end).not.toHaveBeenCalled();
+    unbind();
+  });
+
+  it('leaves mouse and vertical touch movement to native browser behavior', () => {
+    const reader = document.createElement('main');
+    const handlers = {
+      start: vi.fn(), move: vi.fn(), end: vi.fn(), cancel: vi.fn(),
+    };
+    const unbind = bindTouchSwipe(reader, handlers);
 
     dispatchPointer(reader, 'pointerdown', { pointerType: 'mouse', clientX: 100 });
     dispatchPointer(reader, 'pointerup', { pointerType: 'mouse', clientX: 20 });
     dispatchPointer(reader, 'pointerdown', { clientX: 100 });
-    dispatchPointer(reader, 'pointerup', { clientX: 70 });
-    expect(onSwipe).not.toHaveBeenCalled();
+    dispatchPointer(reader, 'pointermove', { clientX: 105, clientY: 140 });
+    dispatchPointer(reader, 'pointerup', { clientX: 105, clientY: 140 });
+    expect(handlers.start).not.toHaveBeenCalled();
+    expect(handlers.end).not.toHaveBeenCalled();
 
     unbind();
+  });
+
+  it('settles from distance or velocity and cancels a short slow drag', () => {
+    expect(swipeTurnDirection({ distance: -80, velocity: -0.1 }, 390)).toBe(1);
+    expect(swipeTurnDirection({ distance: 20, velocity: 0.5 }, 390)).toBe(-1);
+    expect(swipeTurnDirection({ distance: -30, velocity: -0.1 }, 390)).toBe(0);
   });
 });

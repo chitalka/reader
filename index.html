@@ -3,19 +3,145 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f3efe7" />
+    <meta name="theme-color" content="#f3efe7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#191816" media="(prefers-color-scheme: dark)" />
     <meta
       name="description"
       content="Читалка — локальная браузерная читалка для книг в форматах FB2 и EPUB"
     />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="./icons/favicon-16.png" />
+    <link rel="icon" type="image/svg+xml" sizes="any" href="./icons/favicon.svg" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <link rel="preload" href="./icons/icon-192.png" as="image" type="image/png" />
+    <script>
+      (() => {
+        try {
+          const settings = JSON.parse(localStorage.getItem('chitalka:settings:v1') || 'null');
+          if (settings?.theme === 'light' || settings?.theme === 'dark') {
+            document.documentElement.dataset.theme = settings.theme;
+            return;
+          }
+        } catch {}
+        if (matchMedia('(prefers-color-scheme: dark)').matches) {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      })();
+    </script>
+    <style>
+      html {
+        background: #f3efe7;
+      }
+
+      html[data-theme="dark"] {
+        background: #191816;
+      }
+
+      .app-splash {
+        position: fixed;
+        z-index: 1000;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        padding: 24px;
+        color: #262626;
+        background:
+          radial-gradient(circle at 50% 42%, rgba(237, 233, 254, 0.86), transparent 18rem),
+          #f3efe7;
+        opacity: 1;
+        transition: opacity 160ms cubic-bezier(0.23, 1, 0.32, 1);
+      }
+
+      html[data-theme="dark"] .app-splash {
+        color: #e5e5e5;
+        background:
+          radial-gradient(circle at 50% 42%, rgba(46, 16, 101, 0.72), transparent 18rem),
+          #191816;
+      }
+
+      .app-splash[data-motion-state="closing"],
+      .app-splash[data-motion-state="closed"] {
+        pointer-events: none;
+        opacity: 0;
+      }
+
+      .app-splash__content {
+        display: grid;
+        justify-items: center;
+        gap: 18px;
+        text-align: center;
+      }
+
+      .app-splash__mascot {
+        display: block;
+        width: clamp(144px, 18vw, 192px);
+        height: auto;
+        transform-origin: 50% 68%;
+        animation: splash-pulse 1.8s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+        will-change: transform, opacity;
+      }
+
+      .app-splash__label {
+        margin: 0;
+        font-size: clamp(15px, 2vw, 18px);
+        font-weight: 650;
+        letter-spacing: 0.01em;
+      }
+
+      @keyframes splash-pulse {
+        0%, 100% {
+          opacity: 0.82;
+          transform: scale(0.975);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.025);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .app-splash {
+          transition: none;
+        }
+
+        .app-splash__mascot {
+          animation: none;
+          opacity: 1;
+          transform: none;
+          will-change: auto;
+        }
+      }
+    </style>
     <title>Читалка</title>
   </head>
   <body>
-    <div id="app">
+    <div id="app-splash" class="app-splash" role="status" aria-live="polite" aria-atomic="true">
+      <div class="app-splash__content">
+        <img
+          class="app-splash__mascot"
+          src="./icons/icon-192.png"
+          width="192"
+          height="192"
+          alt=""
+          aria-hidden="true"
+        />
+        <p id="app-splash-label" class="app-splash__label">Открываем книгу…</p>
+      </div>
+    </div>
+
+    <div id="app" inert aria-hidden="true">
       <header id="app-header" class="app-header">
-        <a class="brand" href="/" aria-label="Читалка — на главную">
-          <span class="brand-mark" aria-hidden="true">Ч</span>
-          <span>Читалка</span>
+        <a class="brand" href="./" aria-label="Читалка — на главную">
+          <img
+            class="brand-mascot"
+            src="./icons/icon-192.png"
+            width="48"
+            height="48"
+            alt=""
+            aria-hidden="true"
+          />
         </a>
 
         <div class="book-heading" aria-live="polite">
@@ -67,16 +193,17 @@
               <circle cx="12" cy="12" r="3" />
             </svg>
           </button>
-          <label class="open-button" for="book-file">
-            <span class="open-button-label">Открыть книгу</span>
-            <span class="open-button-icon" aria-hidden="true">+</span>
-          </label>
           <input
             id="book-file"
             class="visually-hidden"
             type="file"
+            aria-label="Открыть книгу"
             accept=".fb2,.zip,.epub,application/xml,text/xml,application/zip,application/epub+zip"
           />
+          <label class="open-button" for="book-file">
+            <span class="open-button-label">Открыть книгу</span>
+            <span class="open-button-icon" aria-hidden="true">+</span>
+          </label>
         </div>
       </header>
 
@@ -233,20 +360,25 @@
 
         <fieldset class="settings-group sync-settings">
           <legend>Синхронизация</legend>
-          <p class="settings-help">Вход необязателен. Книги не загружаются в облако.</p>
+          <ul class="settings-help sync-help">
+            <li>Позиция чтения, настройки, закладки и цитаты.</li>
+            <li>Автоматически после изменений и периодически.</li>
+            <li>Совпадающие данные объединяются; при конфликте сохраняется последняя версия.</li>
+            <li>Подключение необязательно; книги не загружаются.</li>
+          </ul>
           <div class="sync-provider">
             <div>
               <strong>Google Drive</strong>
               <span id="google-sync-status">Не подключён</span>
             </div>
-            <button id="google-connect" type="button">Подключить</button>
+            <button id="google-connect" type="button" aria-label="Подключить Google Drive">Подключить</button>
           </div>
           <div class="sync-provider">
             <div>
               <strong>Яндекс.Диск</strong>
               <span id="yandex-sync-status">Не подключён</span>
             </div>
-            <button id="yandex-connect" type="button">Подключить</button>
+            <button id="yandex-connect" type="button" aria-label="Подключить Яндекс.Диск">Подключить</button>
           </div>
           <div class="sync-summary">
             <span id="sync-last-time">Синхронизации ещё не было</span>
@@ -257,7 +389,6 @@
 
       <main id="drop-zone" class="reader-shell" aria-busy="true">
         <section id="reader-status" class="reader-status" role="status">
-          <span class="loader" aria-hidden="true"></span>
           <p id="status-message">Загружаем демонстрационную книгу…</p>
         </section>
 
