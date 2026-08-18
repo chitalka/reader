@@ -8,6 +8,35 @@ const STATIC_PWA_FILES = [
   './icons/icon-maskable-512.png',
 ];
 
+export const YANDEX_METRIKA_ID = 111720126;
+
+const YANDEX_METRIKA_SNIPPET = `<!-- Yandex.Metrika counter -->
+<script type="text/javascript">
+    (function(m,e,t,r,i,k,a){
+        m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+        m[i].l=1*new Date();
+        for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+    })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=111720126', 'ym');
+
+    ym(111720126, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/111720126" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<!-- /Yandex.Metrika counter -->`;
+
+export function injectYandexMetrika(html: string): string {
+  if (html.includes(`mc.yandex.ru/watch/${YANDEX_METRIKA_ID}`)) return html;
+  return html.replace('<body>', `<body>\n    ${YANDEX_METRIKA_SNIPPET.replaceAll('\n', '\n    ')}`);
+}
+
+function yandexMetrika(): Plugin {
+  return {
+    name: 'chitalka-yandex-metrika',
+    apply: 'build',
+    transformIndexHtml: injectYandexMetrika,
+  };
+}
+
 function hashText(hash: number, text: string): number {
   let next = hash;
   for (let index = 0; index < text.length; index += 1) {
@@ -132,7 +161,7 @@ function offlineAppShell(): Plugin {
 
 export default defineConfig({
   base: './',
-  plugins: [offlineAppShell()],
+  plugins: [yandexMetrika(), offlineAppShell()],
   build: {
     target: 'es2022',
   },
