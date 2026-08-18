@@ -21,5 +21,6 @@ describe('production analytics', () => {
     expect(reinjected).toBe(html);
     expect(html.match(/metrika\/tag\.js/gu)).toHaveLength(1);
     expect(html.match(/mc\.yandex\.ru\/watch/gu)).toHaveLength(1);
+    expect(html).not.toMatch(/[ \t]+$/mu);
   });
 });

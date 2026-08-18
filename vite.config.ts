@@ -26,7 +26,11 @@ const YANDEX_METRIKA_SNIPPET = `<!-- Yandex.Metrika counter -->
 
 export function injectYandexMetrika(html: string): string {
   if (html.includes(`mc.yandex.ru/watch/${YANDEX_METRIKA_ID}`)) return html;
-  return html.replace('<body>', `<body>\n    ${YANDEX_METRIKA_SNIPPET.replaceAll('\n', '\n    ')}`);
+  const snippet = YANDEX_METRIKA_SNIPPET
+    .split('\n')
+    .map((line) => line ? `    ${line}` : line)
+    .join('\n');
+  return html.replace('<body>', `<body>\n${snippet}`);
 }
 
 function yandexMetrika(): Plugin {
