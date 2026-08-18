@@ -62,6 +62,6 @@ describe('FB2 source decoder', () => {
   it('reports an empty ZIP archive', async () => {
     const archive = zipSync({});
 
-    await expect(decodeBookBytes(archive, 'empty.zip')).rejects.toThrow('Архив пуст');
+    await expect(decodeBookBytes(archive, 'empty.zip')).rejects.toThrow('The archive is empty');
   });
 });

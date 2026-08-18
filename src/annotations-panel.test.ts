@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AnnotationPanelController, QuoteMenuController } from './annotations-panel';
 import { applyQuoteHighlights, type LocatedSelection } from './reader/quotes';
-import type { QuoteRecord } from './reader/state';
+import type { BookmarkRecord, QuoteRecord } from './reader/state';
 
 describe('AnnotationPanelController', () => {
   it('opens from the header button and creates a bookmark editor', () => {
@@ -42,7 +42,45 @@ describe('AnnotationPanelController', () => {
       delete: () => undefined,
       openChange: () => undefined,
     });
-    controller.setRecords([], [], true);
+    const bookmark: BookmarkRecord = {
+      id: 'bookmark-1',
+      kind: 'bookmark',
+      bookFingerprint: 'book',
+      anchor: 'anchor-1',
+      chapter: 'Chapter one',
+      progress: 10,
+      note: '',
+      color: 'purple',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: { counter: 1, deviceId: 'device' },
+    };
+    const quote: QuoteRecord = {
+      id: 'quote-1',
+      kind: 'quote',
+      bookFingerprint: 'book',
+      start: { anchor: 'anchor-1', offset: 0 },
+      end: { anchor: 'anchor-1', offset: 5 },
+      exact: 'Quote',
+      prefix: '',
+      suffix: '',
+      progress: 12,
+      note: '',
+      color: 'purple',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: { counter: 2, deviceId: 'device' },
+    };
+    controller.setRecords([bookmark], [quote], true);
+
+    expect(byId('bl').querySelector<HTMLButtonElement>('.annotation-card-main')?.title)
+      .toBe('Chapter one');
+    expect(byId('bl').querySelector<HTMLButtonElement>('.annotation-card-edit')?.title)
+      .toBe('Edit');
+    expect(byId('ql').querySelector<HTMLButtonElement>('.annotation-card-main')?.hasAttribute('title'))
+      .toBe(false);
+    expect(byId('ql').querySelector<HTMLButtonElement>('.annotation-card-edit')?.hasAttribute('title'))
+      .toBe(false);
 
     byId<HTMLButtonElement>('button').click();
     expect(byId('panel').hidden).toBe(false);

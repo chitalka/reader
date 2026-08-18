@@ -1,14 +1,22 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Подключение Яндекс.Диска</title>
+    <title>Connecting Yandex Disk</title>
   </head>
   <body>
-    <p>Завершаем подключение…</p>
+    <p>Finishing the connection…</p>
     <script>
       (() => {
+        try {
+          const settings = JSON.parse(localStorage.getItem('chitalka:settings:v1') || 'null');
+          if (settings?.language === 'ru') {
+            document.documentElement.lang = 'ru';
+            document.title = 'Подключение Яндекс.Диска';
+            document.querySelector('p').textContent = 'Завершаем подключение…';
+          }
+        } catch {}
         const parameters = new URLSearchParams(location.search);
         const payload = {
           type: 'chitalka:yandex-oauth',

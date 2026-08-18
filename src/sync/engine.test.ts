@@ -154,7 +154,7 @@ describe('SyncEngine', () => {
     await engine.syncNow();
 
     expect((await repository.read()).settings.theme?.value).toBe('dark');
-    expect(errors.some((message) => message.includes('повреждённый снимок'))).toBe(true);
+    expect(errors.some((message) => message.includes('corrupt snapshot'))).toBe(true);
     engine.destroy();
   });
 });

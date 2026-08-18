@@ -42,8 +42,19 @@ import { SyncEngine } from './sync/engine';
 import type { CloudProvider, ProviderStatusEvent } from './sync/provider';
 import { hideLoadingOverlay, showLoadingOverlay } from './splash';
 import {
+  applyDocumentTranslations,
+  getLanguage,
+  normalizeLanguage,
+  setLanguage as activateLanguage,
+  t,
+  type Language,
+  type TranslationKey,
+} from './i18n';
+import {
   DEFAULT_SETTINGS,
+  effectiveTheme,
   normalizePageButtonsMode,
+  normalizeTheme,
   type FootnoteMode,
   type PageButtonsMode,
   type ReaderSettings,
@@ -54,13 +65,13 @@ const demoBookUrl = new URL('../books/Anna-Karenina.fb2', import.meta.url);
 
 function requiredElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
-  if (!element) throw new Error(`Не найден элемент интерфейса #${id}`);
+  if (!element) throw new Error(t('error.interfaceElement', { id }));
   return element as T;
 }
 
 function requiredInputs(name: string): HTMLInputElement[] {
   const inputs = Array.from(document.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`));
-  if (!inputs.length) throw new Error(`Не найдены элементы настройки ${name}`);
+  if (!inputs.length) throw new Error(t('error.settingInputs', { name }));
   return inputs;
 }
 
@@ -81,6 +92,7 @@ export class ChitalkaApp {
   private readonly library = new ReaderLibrary();
   private readonly googleSyncConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
   private readonly yandexSyncConfigured = Boolean(import.meta.env.VITE_YANDEX_CLIENT_ID);
+  private readonly colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
   private readonly googleProvider = new GoogleDriveProvider();
   private readonly yandexProvider = new YandexDiskProvider();
   private readonly syncEngine = new SyncEngine(
@@ -95,6 +107,7 @@ export class ChitalkaApp {
     (snapshot) => this.onPageChanged(snapshot),
   );
   private currentBookFilename?: string;
+  private currentBookTitle?: string;
   private currentBookFingerprint?: string;
   private currentBookmarks: BookmarkRecord[] = [];
   private currentQuotes: QuoteRecord[] = [];
@@ -107,6 +120,13 @@ export class ChitalkaApp {
   private toastTimer?: number;
   private selectionTimer?: number;
   private selectionPointerActive = false;
+  private loadingMessage: { key: TranslationKey; parameters?: Record<string, string | number> } = {
+    key: 'app.demoLoading',
+  };
+  private readonly providerStatuses = new Map<ProviderStatusEvent['provider'], ProviderStatusEvent>();
+  private syncDisplay: { type: 'never' | 'started' | 'completed' | 'error'; value?: string } = {
+    type: 'never',
+  };
 
   private readonly reader = requiredElement<HTMLElement>('reader');
   private readonly status = requiredElement<HTMLElement>('reader-status');
@@ -165,6 +185,7 @@ export class ChitalkaApp {
   private readonly yandexSyncStatus = requiredElement<HTMLElement>('yandex-sync-status');
   private readonly syncLastTime = requiredElement<HTMLElement>('sync-last-time');
   private readonly syncNowButton = requiredElement<HTMLButtonElement>('sync-now');
+  private readonly languageSelect = requiredElement<HTMLSelectElement>('language-select');
   private readonly themeInputs = requiredInputs('theme');
   private readonly pageModeInputs = requiredInputs('page-mode');
   private readonly pageButtonInputs = requiredInputs('page-buttons');
@@ -186,6 +207,8 @@ export class ChitalkaApp {
   private readonly quoteMenuController: QuoteMenuController;
 
   constructor() {
+    activateLanguage(this.settings.language);
+    applyDocumentTranslations();
     this.settingsPanelController = new SettingsPanelController(
       {
         button: this.settingsButton,
@@ -269,9 +292,8 @@ export class ChitalkaApp {
   private normalizedSettings(value: ReaderSettings): ReaderSettings {
     const pageModes: PageMode[] = ['auto', 'one', 'two'];
     const footnoteModes: FootnoteMode[] = ['appendix', 'inline'];
-    const themes: Theme[] = ['light', 'dark'];
-
     return {
+      language: normalizeLanguage(value.language),
       fontSize: Number.isFinite(value.fontSize)
         ? Math.min(28, Math.max(14, value.fontSize))
         : DEFAULT_SETTINGS.fontSize,
@@ -280,7 +302,7 @@ export class ChitalkaApp {
       footnoteMode: footnoteModes.includes(value.footnoteMode)
         ? value.footnoteMode
         : DEFAULT_SETTINGS.footnoteMode,
-      theme: themes.includes(value.theme) ? value.theme : DEFAULT_SETTINGS.theme,
+      theme: normalizeTheme(value.theme),
       wordsPerMinute: Number.isFinite(value.wordsPerMinute)
         ? Math.min(500, Math.max(80, value.wordsPerMinute))
         : DEFAULT_SETTINGS.wordsPerMinute,
@@ -288,11 +310,12 @@ export class ChitalkaApp {
   }
 
   private applySettings(): void {
+    this.applyLanguage();
     this.pager.setFontSize(this.settings.fontSize);
     this.pager.setPageMode(this.settings.pageMode);
     this.content.querySelector<HTMLElement>('.book')
       ?.setAttribute('data-footnotes', this.settings.footnoteMode);
-    document.documentElement.dataset.theme = this.settings.theme;
+    this.applyTheme();
     document.documentElement.dataset.pageButtons = this.settings.pageButtons;
     this.updateSettingsControls();
   }
@@ -323,6 +346,10 @@ export class ChitalkaApp {
       });
     }
     this.backButton.addEventListener('click', () => this.returnFromFootnote());
+    this.languageSelect.addEventListener('change', () => {
+      this.setInterfaceLanguage(normalizeLanguage(this.languageSelect.value));
+    });
+    this.colorSchemeQuery.addEventListener('change', this.handleColorSchemeChange);
 
     this.fileInput.addEventListener('change', () => {
       const file = this.fileInput.files?.[0];
@@ -392,8 +419,8 @@ export class ChitalkaApp {
   }
 
   private async loadFile(file: File): Promise<void> {
-    this.setLoading(`Открываем «${file.name}»…`);
-    await showLoadingOverlay();
+    this.setLoading('loading.openFile', { filename: file.name });
+    await showLoadingOverlay(t('loading.openFile', { filename: file.name }));
     try {
       await this.loadDecoded(await decodeBookFile(file));
     } catch (error) {
@@ -404,7 +431,7 @@ export class ChitalkaApp {
   }
 
   private async loadDecoded(source: DecodedBookSource): Promise<void> {
-    this.setLoading(`Готовим «${source.filename}»…`);
+    this.setLoading('loading.prepareFile', { filename: source.filename });
     const rendered = source.format === 'epub'
       ? renderEpub(parseEpubArchive(source.files))
       : renderFb2(parseFb2(source.xml));
@@ -412,6 +439,7 @@ export class ChitalkaApp {
     bookRoot?.setAttribute('data-footnotes', this.settings.footnoteMode);
 
     this.currentBookFilename = source.filename;
+    this.currentBookTitle = rendered.metadata.title;
     this.currentBookFingerprint = source.fingerprint;
     this.currentWordCount = rendered.wordCount;
     this.currentTocTargets = tocTargets(rendered.toc);
@@ -420,7 +448,7 @@ export class ChitalkaApp {
     this.backButton.hidden = true;
     this.title.textContent = rendered.metadata.title;
     this.author.textContent = rendered.metadata.authors.join(', ');
-    document.title = `${rendered.metadata.title} — Читалка`;
+    document.title = `${rendered.metadata.title} — ${t('app.name')}`;
 
     await this.library.registerBook({
       fingerprint: source.fingerprint,
@@ -443,12 +471,13 @@ export class ChitalkaApp {
     this.headerVisibility.reveal();
   }
 
-  private setLoading(message: string): void {
+  private setLoading(key: TranslationKey, parameters?: Record<string, string | number>): void {
     this.settingsPanelController.close(false);
     this.annotationPanelController.close(false);
     this.tocPanelController.setItems([]);
     this.isPreparing = true;
     this.currentBookFilename = undefined;
+    this.currentBookTitle = undefined;
     this.currentBookFingerprint = undefined;
     this.currentBookmarks = [];
     this.currentQuotes = [];
@@ -460,7 +489,8 @@ export class ChitalkaApp {
       window.clearTimeout(this.savePositionTimer);
       this.savePositionTimer = undefined;
     }
-    this.statusMessage.textContent = message;
+    this.loadingMessage = { key, parameters };
+    this.statusMessage.textContent = t(key, parameters);
     this.status.classList.remove('is-error');
     this.status.hidden = false;
     this.reader.hidden = false;
@@ -470,7 +500,7 @@ export class ChitalkaApp {
   }
 
   private showError(error: unknown): void {
-    const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
+    const message = error instanceof Error ? error.message : t('error.unknown');
     this.showToast(message);
 
     this.currentBookFilename = undefined;
@@ -480,7 +510,7 @@ export class ChitalkaApp {
     this.annotationPanelController.close(false);
     this.annotationPanelController.setRecords([], [], false);
     this.quoteMenuController.close();
-    this.statusMessage.textContent = `${message}. Выберите другую книгу.`;
+    this.statusMessage.textContent = t('error.chooseAnother', { message });
     this.status.classList.add('is-error');
     this.status.hidden = false;
     this.reader.classList.add('is-preparing');
@@ -495,21 +525,7 @@ export class ChitalkaApp {
       this.pager.closestPrecedingAnchor(this.currentTocTargets, snapshot.anchor),
     );
 
-    if (snapshot.paginationExact) {
-      const lastPage = Math.min(
-        snapshot.totalPages,
-        snapshot.currentPage + snapshot.pagesPerView - 1,
-      );
-      this.pageLabel.textContent = lastPage > snapshot.currentPage
-        ? `Страницы ${snapshot.currentPage}–${lastPage} из ${snapshot.totalPages}`
-        : `Страница ${snapshot.currentPage} из ${snapshot.totalPages}`;
-      this.progress.value = snapshot.progress;
-      this.progress.textContent = `${Math.round(snapshot.progress)}%`;
-      this.updateTimeEstimate(snapshot.progress);
-      this.setPaginationPending(false);
-    } else {
-      this.setPaginationPending(true);
-    }
+    this.renderProgress(snapshot);
 
     if (this.currentBookFingerprint && !this.isPreparing) {
       if (this.savePositionTimer) window.clearTimeout(this.savePositionTimer);
@@ -530,6 +546,28 @@ export class ChitalkaApp {
     this.updateCurrentBookmark(snapshot.anchor);
   }
 
+  private renderProgress(snapshot: PagerSnapshot): void {
+    if (snapshot.paginationExact) {
+      const lastPage = Math.min(
+        snapshot.totalPages,
+        snapshot.currentPage + snapshot.pagesPerView - 1,
+      );
+      this.pageLabel.textContent = lastPage > snapshot.currentPage
+        ? t('reader.pages', {
+          first: snapshot.currentPage,
+          last: lastPage,
+          total: snapshot.totalPages,
+        })
+        : t('reader.page', { current: snapshot.currentPage, total: snapshot.totalPages });
+      this.progress.value = snapshot.progress;
+      this.progress.textContent = `${Math.round(snapshot.progress)}%`;
+      this.updateTimeEstimate(snapshot.progress);
+      this.setPaginationPending(false);
+    } else {
+      this.setPaginationPending(true);
+    }
+  }
+
   private setPaginationPending(pending: boolean): void {
     this.progressGroup.classList.toggle('is-pending', pending);
     this.progressGroup.setAttribute('aria-busy', String(pending));
@@ -541,13 +579,13 @@ export class ChitalkaApp {
     const minutes = Math.ceil(wordsLeft / this.settings.wordsPerMinute);
 
     if (minutes <= 1) {
-      this.timeLabel.textContent = 'До конца меньше минуты';
+      this.timeLabel.textContent = t('reader.lessThanMinute');
     } else if (minutes < 60) {
-      this.timeLabel.textContent = `До конца около ${minutes} мин`;
+      this.timeLabel.textContent = t('reader.minutesLeft', { minutes });
     } else {
       const hours = Math.floor(minutes / 60);
       const remainder = minutes % 60;
-      this.timeLabel.textContent = `До конца около ${hours} ч ${remainder} мин`;
+      this.timeLabel.textContent = t('reader.hoursLeft', { hours, minutes: remainder });
     }
   }
 
@@ -590,9 +628,17 @@ export class ChitalkaApp {
   private setTheme(theme: Theme): void {
     if (theme === this.settings.theme) return;
     this.settings.theme = theme;
-    document.documentElement.dataset.theme = this.settings.theme;
+    this.applyTheme();
     this.saveSettings('theme');
     this.updateSettingsControls();
+  }
+
+  private applyTheme(): void {
+    const theme = effectiveTheme(this.settings.theme, this.colorSchemeQuery.matches);
+    document.documentElement.dataset.themeMode = this.settings.theme;
+    document.documentElement.dataset.theme = theme;
+    const themeColor = document.querySelector<HTMLMetaElement>('#app-theme-color');
+    if (themeColor) themeColor.content = theme === 'dark' ? '#191816' : '#f3efe7';
   }
 
   private updateSettingsControls(): void {
@@ -612,6 +658,35 @@ export class ChitalkaApp {
     void this.library.updateSetting(key, this.settings[key]);
   }
 
+  private setInterfaceLanguage(language: Language): void {
+    if (language === this.settings.language) return;
+    this.settings.language = language;
+    this.saveSettings('language');
+    this.applyLanguage();
+  }
+
+  private applyLanguage(): void {
+    activateLanguage(this.settings.language);
+    applyDocumentTranslations();
+    this.languageSelect.value = this.settings.language;
+    this.annotationPanelController?.refreshLanguage();
+    this.quoteMenuController?.refreshLanguage();
+    if (this.currentBookTitle) {
+      this.title.textContent = this.currentBookTitle;
+      document.title = `${this.currentBookTitle} — ${t('app.name')}`;
+    } else {
+      this.title.textContent = t('app.openingLibrary');
+      document.title = t('app.name');
+    }
+    if (this.isPreparing && !this.status.classList.contains('is-error')) {
+      this.statusMessage.textContent = t(this.loadingMessage.key, this.loadingMessage.parameters);
+    }
+    if (!this.isPreparing) this.renderProgress(this.pager.getSnapshot());
+    this.renderSyncDisplay();
+    for (const event of this.providerStatuses.values()) this.updateProviderStatus(event);
+    this.showMissingSyncConfiguration();
+  }
+
   private handleContentClick(event: MouseEvent): void {
     const highlight = (event.target as Element | null)?.closest<HTMLElement>('[data-reader-quote]');
     const quoteId = highlight?.dataset.readerQuote;
@@ -621,7 +696,7 @@ export class ChitalkaApp {
       event.stopPropagation();
       const range = rangeForQuote(this.content, quote);
       if (!range) {
-        this.showToast('Место цитаты не найдено');
+        this.showToast(t('error.quoteLocation'));
         return;
       }
       restoreSelection(this.content, quote);
@@ -769,7 +844,7 @@ export class ChitalkaApp {
     const fingerprint = this.currentBookFingerprint;
     const snapshot = this.pager.getSnapshot();
     if (!fingerprint || !snapshot.anchor) {
-      this.showToast('Не удалось определить текущее место');
+      this.showToast(t('error.currentLocation'));
       return;
     }
     await this.library.addBookmark(fingerprint, snapshot.anchor, {
@@ -779,16 +854,16 @@ export class ChitalkaApp {
       color,
     });
     await this.refreshAnnotations();
-    this.showToast('Закладка сохранена');
+    this.showToast(t('toast.bookmarkSaved'));
   }
 
   private goToBookmark(record: BookmarkRecord): void {
-    if (!this.pager.goToAnchor(record.anchor, true)) this.showToast('Место закладки не найдено');
+    if (!this.pager.goToAnchor(record.anchor, true)) this.showToast(t('error.bookmarkLocation'));
   }
 
   private goToQuote(record: QuoteRecord): void {
     if (!this.pager.goToTextOffset(record.start.anchor, record.start.offset, true)) {
-      this.showToast('Место цитаты не найдено');
+      this.showToast(t('error.quoteLocation'));
       return;
     }
     this.applyCurrentHighlights();
@@ -809,7 +884,7 @@ export class ChitalkaApp {
     else await this.library.editBookmark(record.id, note, color);
     await this.refreshAnnotations();
     this.applyCurrentHighlights();
-    this.showToast('Изменения сохранены');
+    this.showToast(t('toast.changesSaved'));
   }
 
   private async deleteAnnotation(record: BookmarkRecord | QuoteRecord): Promise<void> {
@@ -817,7 +892,7 @@ export class ChitalkaApp {
     else await this.library.deleteBookmark(record.id);
     await this.refreshAnnotations();
     this.applyCurrentHighlights();
-    this.showToast(record.kind === 'quote' ? 'Цитата удалена' : 'Закладка удалена');
+    this.showToast(t(record.kind === 'quote' ? 'toast.quoteDeleted' : 'toast.bookmarkDeleted'));
   }
 
   private scheduleSelectionMenu(): void {
@@ -860,7 +935,7 @@ export class ChitalkaApp {
     await this.refreshAnnotations();
     this.applyCurrentHighlights();
     window.getSelection()?.removeAllRanges();
-    this.showToast('Цитата сохранена');
+    this.showToast(t('toast.quoteSaved'));
   }
 
   private async refreshAnnotations(): Promise<void> {
@@ -901,31 +976,35 @@ export class ChitalkaApp {
     this.syncEngine.providerEvents((event) => this.updateProviderStatus(event));
     this.syncEngine.subscribe((event) => {
       if (event.type === 'started') {
-        this.syncLastTime.textContent = 'Синхронизируем…';
+        this.syncDisplay = { type: 'started' };
       } else if (event.type === 'completed' && event.lastSyncAt) {
-        this.syncLastTime.textContent = `Последняя синхронизация: ${this.formatSyncTime(event.lastSyncAt)}`;
+        this.syncDisplay = { type: 'completed', value: event.lastSyncAt };
       } else if (event.type === 'error') {
-        this.syncLastTime.textContent = event.message || 'Ошибка синхронизации';
+        this.syncDisplay = { type: 'error', value: event.message };
       }
+      this.renderSyncDisplay();
     });
     this.googleConnect.addEventListener('click', () => void this.toggleProvider(this.googleProvider));
     this.yandexConnect.addEventListener('click', () => void this.toggleProvider(this.yandexProvider));
     this.syncNowButton.addEventListener('click', () => void this.syncEngine.syncNow());
     const lastSync = localStorage.getItem('chitalka:sync:last');
-    if (lastSync) this.syncLastTime.textContent = `Последняя синхронизация: ${this.formatSyncTime(lastSync)}`;
+    if (lastSync) {
+      this.syncDisplay = { type: 'completed', value: lastSync };
+      this.renderSyncDisplay();
+    }
     this.showMissingSyncConfiguration();
   }
 
   private showMissingSyncConfiguration(): void {
     if (!this.googleSyncConfigured) {
-      this.googleSyncStatus.textContent = 'Нужен Client ID';
+      this.googleSyncStatus.textContent = t('sync.clientIdRequired');
       this.googleConnect.disabled = true;
-      this.googleConnect.title = 'Задайте VITE_GOOGLE_CLIENT_ID при сборке';
+      this.googleConnect.title = t('sync.clientIdBuild', { variable: 'VITE_GOOGLE_CLIENT_ID' });
     }
     if (!this.yandexSyncConfigured) {
-      this.yandexSyncStatus.textContent = 'Нужен Client ID';
+      this.yandexSyncStatus.textContent = t('sync.clientIdRequired');
       this.yandexConnect.disabled = true;
-      this.yandexConnect.title = 'Задайте VITE_YANDEX_CLIENT_ID при сборке';
+      this.yandexConnect.title = t('sync.clientIdBuild', { variable: 'VITE_YANDEX_CLIENT_ID' });
     }
   }
 
@@ -956,42 +1035,66 @@ export class ChitalkaApp {
         await this.syncEngine.syncNow();
       }
     } catch (error) {
-      this.showToast(error instanceof Error ? error.message : 'Не удалось подключить облако');
+      this.showToast(error instanceof Error ? error.message : t('error.cloudConnect'));
     }
   }
 
   private updateProviderStatus(event: ProviderStatusEvent): void {
+    this.providerStatuses.set(event.provider, event);
     const label = event.provider === 'google' ? this.googleSyncStatus : this.yandexSyncStatus;
     const button = event.provider === 'google' ? this.googleConnect : this.yandexConnect;
-    const providerName = event.provider === 'google' ? 'Google Drive' : 'Яндекс.Диск';
+    const providerName = event.provider === 'google' ? 'Google Drive' : t('sync.yandex');
     const statuses: Record<ProviderStatusEvent['status'], string> = {
-      disconnected: 'Не подключён',
-      connecting: 'Подключаем…',
-      connected: 'Подключён',
-      syncing: 'Синхронизируем…',
-      reconnect: 'Нужно переподключить',
-      error: event.message || 'Ошибка',
+      disconnected: t('sync.notConnected'),
+      connecting: t('sync.connecting'),
+      connected: t('sync.connected'),
+      syncing: t('sync.syncing'),
+      reconnect: t('sync.needsReconnect'),
+      error: event.message || t('sync.error'),
     };
     label.textContent = statuses[event.status];
     const connected = event.status === 'connected' || event.status === 'syncing';
-    const action = connected ? 'Отключить' : event.status === 'reconnect' ? 'Переподключить' : 'Подключить';
+    const action = t(connected
+      ? 'sync.disconnect'
+      : event.status === 'reconnect' ? 'sync.reconnect' : 'sync.connect');
     button.textContent = action;
     button.setAttribute('aria-label', `${action} ${providerName}`);
+    button.title = `${action} ${providerName}`;
     button.disabled = event.status === 'connecting' || event.status === 'syncing';
     if (
       (event.provider === 'google' && !this.googleSyncConfigured)
       || (event.provider === 'yandex' && !this.yandexSyncConfigured)
     ) {
-      label.textContent = 'Нужен Client ID';
+      label.textContent = t('sync.clientIdRequired');
       button.disabled = true;
     }
     this.syncNowButton.disabled = ![this.googleProvider, this.yandexProvider]
       .some((candidate) => candidate.status === 'connected');
   }
 
+  private renderSyncDisplay(): void {
+    switch (this.syncDisplay.type) {
+      case 'started':
+        this.syncLastTime.textContent = t('sync.syncing');
+        break;
+      case 'completed':
+        this.syncLastTime.textContent = t('sync.last', {
+          time: this.formatSyncTime(this.syncDisplay.value ?? ''),
+        });
+        break;
+      case 'error':
+        this.syncLastTime.textContent = this.syncDisplay.value || t('sync.errorGeneric');
+        break;
+      default:
+        this.syncLastTime.textContent = t('sync.never');
+    }
+  }
+
   private formatSyncTime(value: string): string {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? 'неизвестно' : date.toLocaleString('ru-RU');
+    return Number.isNaN(date.getTime())
+      ? t('sync.unknownTime')
+      : date.toLocaleString(getLanguage() === 'ru' ? 'ru-RU' : 'en-US');
   }
 
   private showToast(message: string): void {
@@ -1005,6 +1108,10 @@ export class ChitalkaApp {
 
   private showHeaderHint(): void {
     if (this.isPreparing || !this.onboarding.claimHeaderHint()) return;
-    this.showToast('Нажмите на текст, чтобы показать меню');
+    this.showToast(t('toast.headerHint'));
   }
+
+  private readonly handleColorSchemeChange = (): void => {
+    if (this.settings.theme === 'auto') this.applyTheme();
+  };
 }

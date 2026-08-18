@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from 'vitest/config';
 
 const STATIC_PWA_FILES = [
   './manifest.webmanifest',
+  './manifest.ru.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
@@ -84,7 +85,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  const mutablePwaAsset = url.pathname.endsWith('/manifest.webmanifest')
+  const mutablePwaAsset = url.pathname.endsWith('.webmanifest')
     || url.pathname.includes('/icons/');
 
   event.respondWith(

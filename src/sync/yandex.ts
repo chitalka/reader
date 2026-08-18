@@ -1,4 +1,5 @@
 import { BaseCloudProvider, ProviderError, type RemoteDocument } from './provider';
+import { t } from '../i18n';
 
 interface YandexCallbackMessage {
   type: 'chitalka:yandex-oauth';
@@ -28,7 +29,9 @@ function randomToken(length = 48): string {
 
 export class YandexDiskProvider extends BaseCloudProvider {
   readonly id = 'yandex' as const;
-  readonly label = 'Яндекс.Диск';
+  get label(): string {
+    return t('sync.yandex');
+  }
   private accessToken?: string;
   private expiresAt = 0;
 
@@ -38,8 +41,11 @@ export class YandexDiskProvider extends BaseCloudProvider {
 
   async connect(): Promise<void> {
     if (!this.clientId) {
-      this.setStatus('error', 'Не задан Client ID');
-      throw new ProviderError('Для Яндекс.Диска не задан VITE_YANDEX_CLIENT_ID', 'configuration');
+      this.setStatus('error', t('sync.clientIdRequired'));
+      throw new ProviderError(t('error.clientIdMissing', {
+        provider: t('sync.yandex'),
+        variable: 'VITE_YANDEX_CLIENT_ID',
+      }), 'configuration');
     }
     this.setStatus('connecting');
     const state = randomToken(24);
@@ -63,8 +69,8 @@ export class YandexDiskProvider extends BaseCloudProvider {
       'popup=yes,width=520,height=720,resizable=yes,scrollbars=yes',
     );
     if (!popup) {
-      this.setStatus('error', 'Браузер заблокировал окно авторизации');
-      throw new ProviderError('Разрешите всплывающие окна для подключения Яндекс.Диска', 'authorization');
+      this.setStatus('error', t('error.popupBlocked'));
+      throw new ProviderError(t('error.allowPopup', { provider: t('sync.yandex') }), 'authorization');
     }
 
     try {
@@ -88,7 +94,7 @@ export class YandexDiskProvider extends BaseCloudProvider {
       };
       if (!response.ok || !result.access_token) {
         throw new ProviderError(
-          result.error_description || result.error || 'Яндекс не выдал токен',
+          result.error_description || result.error || t('error.yandexNoToken'),
           'authorization',
         );
       }
@@ -99,7 +105,7 @@ export class YandexDiskProvider extends BaseCloudProvider {
       this.setStatus('connected');
     } catch (error) {
       popup.close();
-      this.setStatus('error', error instanceof Error ? error.message : 'Ошибка подключения');
+      this.setStatus('error', error instanceof Error ? error.message : t('error.connection'));
       throw error;
     }
   }
@@ -114,7 +120,7 @@ export class YandexDiskProvider extends BaseCloudProvider {
     const parameters = new URLSearchParams({ path: 'app:/', limit: '1000', fields: '_embedded.items.name,_embedded.items.path,_embedded.items.modified,_embedded.items.size' });
     const response = await this.response(await fetch(`${DISK_API}/resources?${parameters}`, {
       headers: { Authorization: `OAuth ${this.token()}` },
-    }), 'Не удалось получить данные Яндекс.Диска');
+    }), t('error.yandexList'));
     const body = await response.json() as {
       _embedded?: { items?: Array<{ name: string; path: string; modified?: string; size?: number }> };
     };
@@ -132,11 +138,11 @@ export class YandexDiskProvider extends BaseCloudProvider {
     const parameters = new URLSearchParams({ path: document.id });
     const linkResponse = await this.response(await fetch(`${DISK_API}/resources/download?${parameters}`, {
       headers: { Authorization: `OAuth ${this.token()}` },
-    }), 'Не удалось получить ссылку Яндекс.Диска');
+    }), t('error.yandexDownloadLink'));
     const link = await linkResponse.json() as { href?: string };
-    if (!link.href) throw new ProviderError('Яндекс.Диск не вернул ссылку на скачивание', 'invalid-response');
+    if (!link.href) throw new ProviderError(t('error.yandexNoDownloadLink'), 'invalid-response');
     const response = await fetch(link.href);
-    if (!response.ok) throw new ProviderError(`Не удалось скачать снимок: HTTP ${response.status}`, 'network');
+    if (!response.ok) throw new ProviderError(t('error.snapshotDownload', { status: response.status }), 'network');
     return response.text();
   }
 
@@ -144,15 +150,15 @@ export class YandexDiskProvider extends BaseCloudProvider {
     const parameters = new URLSearchParams({ path: `app:/${name}`, overwrite: 'false' });
     const linkResponse = await this.response(await fetch(`${DISK_API}/resources/upload?${parameters}`, {
       headers: { Authorization: `OAuth ${this.token()}` },
-    }), 'Не удалось получить ссылку загрузки Яндекс.Диска');
+    }), t('error.yandexUploadLink'));
     const link = await linkResponse.json() as { href?: string; method?: string };
-    if (!link.href) throw new ProviderError('Яндекс.Диск не вернул ссылку на загрузку', 'invalid-response');
+    if (!link.href) throw new ProviderError(t('error.yandexNoUploadLink'), 'invalid-response');
     const response = await fetch(link.href, {
       method: link.method ?? 'PUT',
       headers: { 'Content-Type': 'application/json; charset=UTF-8' },
       body: content,
     });
-    if (!response.ok) throw new ProviderError(`Не удалось загрузить снимок: HTTP ${response.status}`, 'network');
+    if (!response.ok) throw new ProviderError(t('error.snapshotUpload', { status: response.status }), 'network');
   }
 
   async delete(document: RemoteDocument): Promise<void> {
@@ -160,34 +166,37 @@ export class YandexDiskProvider extends BaseCloudProvider {
     await this.response(await fetch(`${DISK_API}/resources?${parameters}`, {
       method: 'DELETE',
       headers: { Authorization: `OAuth ${this.token()}` },
-    }), 'Не удалось удалить старый снимок Яндекс.Диска');
+    }), t('error.yandexDelete'));
   }
 
   private token(): string {
     if (!this.accessToken || Date.now() >= this.expiresAt) {
       this.accessToken = undefined;
-      this.setStatus('reconnect', 'Нужно переподключить');
-      throw new ProviderError('Токен Яндекс.Диска истёк', 'authorization');
+      this.setStatus('reconnect', t('sync.needsReconnect'));
+      throw new ProviderError(t('error.yandexTokenExpired'), 'authorization');
     }
     return this.accessToken;
   }
 
   private waitForCode(popup: Window, expectedState: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const timeout = window.setTimeout(() => finish(new ProviderError('Время авторизации истекло', 'authorization')), 5 * 60_000);
+      const timeout = window.setTimeout(() => finish(new ProviderError(t('error.authorizationTimeout'), 'authorization')), 5 * 60_000);
       const closedPoll = window.setInterval(() => {
-        if (popup.closed) finish(new ProviderError('Окно авторизации закрыто', 'authorization'));
+        if (popup.closed) finish(new ProviderError(t('error.authorizationClosed'), 'authorization'));
       }, 400);
       const onMessage = (event: MessageEvent<YandexCallbackMessage>): void => {
         if (event.origin !== location.origin || event.source !== popup) return;
         const message = event.data;
         if (message?.type !== 'chitalka:yandex-oauth') return;
         if (message.state !== expectedState) {
-          finish(new ProviderError('OAuth state не совпадает', 'authorization'));
+          finish(new ProviderError(t('error.oauthState'), 'authorization'));
           return;
         }
         if (message.error || !message.code) {
-          finish(new ProviderError(message.errorDescription || message.error || 'Авторизация отменена', 'authorization'));
+          finish(new ProviderError(
+            message.errorDescription || message.error || t('error.authorizationCancelled'),
+            'authorization',
+          ));
           return;
         }
         finish(undefined, message.code);

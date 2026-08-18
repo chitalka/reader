@@ -25,7 +25,7 @@ describe('FB2 parser', () => {
   });
 
   it('rejects malformed XML', () => {
-    expect(() => parseFb2('<FictionBook><body></FictionBook>')).toThrow('Некорректный XML');
+    expect(() => parseFb2('<FictionBook><body></FictionBook>')).toThrow('Invalid XML');
   });
 
   it('derives a hierarchical table of contents and excludes notes', () => {
@@ -52,6 +52,6 @@ describe('FB2 parser', () => {
   });
 
   it('rejects XML of another format', () => {
-    expect(() => parseFb2('<catalog><book /></catalog>')).toThrow('Файл не является книгой FB2');
+    expect(() => parseFb2('<catalog><book /></catalog>')).toThrow('This file is not an FB2 book');
   });
 });

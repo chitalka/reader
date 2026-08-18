@@ -2,6 +2,7 @@ import { normalizedText } from '../book/model';
 import { decodeXml } from '../fb2/decode';
 import type { EpubManifestItem, EpubSpineItem, EpubTocItem, ParsedEpub } from './model';
 import { resolveArchivePath, resolveEpubReference } from './path';
+import { t } from '../i18n';
 
 const PACKAGE_MEDIA_TYPE = 'application/oebps-package+xml';
 const CONTENT_MEDIA_TYPES = new Set(['application/xhtml+xml', 'text/html']);
@@ -15,7 +16,7 @@ function parseXml(bytes: Uint8Array, label: string): XMLDocument {
   const parsed = new DOMParser().parseFromString(decodeXml(bytes), 'application/xml');
   const error = parsed.querySelector('parsererror');
   if (error) {
-    throw new Error(`Некорректный EPUB: не удалось прочитать ${label}`);
+    throw new Error(t('error.epubRead', { label }));
   }
   return parsed;
 }
@@ -32,8 +33,8 @@ function normalizeFiles(files: Record<string, Uint8Array>): Map<string, Uint8Arr
 function metadataFromPackage(packageDocument: XMLDocument) {
   const metadata = elementsByName(packageDocument, 'metadata')[0];
   const title = metadata
-    ? normalizedText(elementsByName(metadata, 'title')[0]) || 'Без названия'
-    : 'Без названия';
+    ? normalizedText(elementsByName(metadata, 'title')[0]) || t('book.untitled')
+    : t('book.untitled');
   const authors = metadata
     ? elementsByName(metadata, 'creator').map(normalizedText).filter(Boolean)
     : [];
@@ -211,7 +212,7 @@ function assertNoEncryptedContent(
     const path = uri && resolveArchivePath('', uri);
     const mediaType = path ? mediaTypeByPath.get(path) : undefined;
     if (path && (mediaType?.startsWith('font/') || FONT_EXTENSIONS.test(path))) continue;
-    throw new Error('EPUB с DRM или зашифрованным содержимым не поддерживается');
+    throw new Error(t('error.epubEncrypted'));
   }
 }
 
@@ -219,7 +220,7 @@ export function parseEpubArchive(archive: Record<string, Uint8Array>): ParsedEpu
   const files = normalizeFiles(archive);
   const containerBytes = files.get('META-INF/container.xml');
   if (!containerBytes) {
-    throw new Error('Некорректный EPUB: отсутствует META-INF/container.xml');
+    throw new Error(t('error.epubContainerMissing'));
   }
 
   const container = parseXml(containerBytes, 'META-INF/container.xml');
@@ -227,22 +228,22 @@ export function parseEpubArchive(archive: Record<string, Uint8Array>): ParsedEpu
   const rootfilePath = rootfile?.getAttribute('full-path') ?? '';
   const packagePath = resolveArchivePath('', rootfilePath);
   if (!packagePath) {
-    throw new Error('Некорректный EPUB: не указан package document');
+    throw new Error(t('error.epubPackageUnspecified'));
   }
   const packageBytes = files.get(packagePath);
   if (!packageBytes) {
-    throw new Error(`Некорректный EPUB: не найден package document «${packagePath}»`);
+    throw new Error(t('error.epubPackageMissing', { path: packagePath }));
   }
   if (rootfile?.getAttribute('media-type') && rootfile.getAttribute('media-type') !== PACKAGE_MEDIA_TYPE) {
-    throw new Error('Некорректный EPUB: неизвестный тип package document');
+    throw new Error(t('error.epubPackageType'));
   }
 
   const packageDocument = parseXml(packageBytes, packagePath);
   if (packageDocument.documentElement.localName !== 'package') {
-    throw new Error('Некорректный EPUB: package document не содержит package');
+    throw new Error(t('error.epubPackageRoot'));
   }
   if (isFixedLayout(packageDocument)) {
-    throw new Error('EPUB с фиксированной вёрсткой пока не поддерживается');
+    throw new Error(t('error.epubFixedLayout'));
   }
 
   const manifestElement = elementsByName(packageDocument, 'manifest')[0];
@@ -275,13 +276,13 @@ export function parseEpubArchive(archive: Record<string, Uint8Array>): ParsedEpu
       const supported = manifestItem && supportedManifestItem(manifestItem, manifest);
       if (!supported) continue;
       if (!files.has(supported.path)) {
-        throw new Error(`Некорректный EPUB: не найден документ «${supported.path}»`);
+        throw new Error(t('error.epubDocumentMissing', { path: supported.path }));
       }
       spine.push({ item: supported, linear: itemref.getAttribute('linear') !== 'no' });
     }
   }
   if (!spine.length) {
-    throw new Error('Некорректный EPUB: порядок чтения spine пуст');
+    throw new Error(t('error.epubSpineEmpty'));
   }
 
   const navigation = navigationToc(files, manifest);

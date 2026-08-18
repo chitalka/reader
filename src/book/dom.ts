@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+
 const MAX_CHUNK_ANCHORS = 96;
 
 function anchorCount(element: HTMLElement): number {
@@ -64,7 +66,7 @@ export function appendBookChunks(
     chunk.dataset.readerChunk = '';
     if (notes) {
       chunk.dataset.readerNotes = '';
-      chunk.setAttribute('aria-label', 'Сноски');
+      chunk.setAttribute('aria-label', t('reader.footnotes'));
     }
     chunk.append(...pending);
     book.append(chunk);

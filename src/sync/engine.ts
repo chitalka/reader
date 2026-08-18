@@ -6,6 +6,7 @@ import {
   type SyncSnapshot,
 } from '../reader/state';
 import { BaseCloudProvider, type CloudProvider, type ProviderStatusEvent, type RemoteDocument } from './provider';
+import { t } from '../i18n';
 
 const SNAPSHOT_PREFIX = `chitalka-v${READER_STATE_VERSION}-`;
 const SYNC_DELAY = 2500;
@@ -169,12 +170,12 @@ export class SyncEngine {
             } else {
               this.emit({
                 type: 'error',
-                message: `${provider.label}: повреждённый снимок «${document.name}» пропущен`,
+                message: t('error.snapshotCorrupt', { provider: provider.label, name: document.name }),
               });
             }
           }
         } catch (error) {
-          this.emit({ type: 'error', message: error instanceof Error ? error.message : 'Ошибка облака' });
+          this.emit({ type: 'error', message: error instanceof Error ? error.message : t('error.cloud') });
         }
       }
 
@@ -223,16 +224,16 @@ export class SyncEngine {
           await provider.upload(name, content);
           const refreshed = await provider.list();
           const uploaded = refreshed.find((document) => document.name === name);
-          if (!uploaded) throw new Error(`${provider.label}: загруженный снимок не найден`);
+          if (!uploaded) throw new Error(t('error.snapshotUploadedMissing', { provider: provider.label }));
           const uploadedContent = await provider.download(uploaded);
           if (uploadedContent !== content || !(await validateSnapshot(uploaded, uploadedContent))) {
-            throw new Error(`${provider.label}: проверка загруженного снимка не пройдена`);
+            throw new Error(t('error.snapshotVerification', { provider: provider.label }));
           }
           providerDocuments.set(provider, refreshed);
           validNames.add(name);
         } catch (error) {
           allProvidersConverged = false;
-          this.emit({ type: 'error', message: error instanceof Error ? error.message : 'Ошибка загрузки' });
+          this.emit({ type: 'error', message: error instanceof Error ? error.message : t('error.upload') });
         }
       }
 
@@ -247,7 +248,7 @@ export class SyncEngine {
       localStorage.setItem('chitalka:sync:last', lastSyncAt);
       this.emit({ type: 'completed', lastSyncAt });
     } catch (error) {
-      this.emit({ type: 'error', message: error instanceof Error ? error.message : 'Синхронизация не удалась' });
+      this.emit({ type: 'error', message: error instanceof Error ? error.message : t('error.syncFailed') });
     } finally {
       providers.forEach((provider) => (provider as BaseCloudProvider).setSyncing?.(false));
       this.running = false;

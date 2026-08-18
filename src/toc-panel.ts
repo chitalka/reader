@@ -104,6 +104,7 @@ export class TocPanelController {
         button.type = 'button';
         button.dataset.tocTarget = item.target;
         button.textContent = item.title;
+        button.title = item.title;
         listItem.append(button);
       } else {
         const label = document.createElement('span');
@@ -142,6 +143,7 @@ export class TocPanelController {
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
     if (!this.isOpen || !(event.target instanceof Node)) return;
+    if (event.target instanceof Element && event.target.closest('[data-language-switcher]')) return;
     if (event.target === this.elements.backdrop) return;
     if (this.elements.panel.contains(event.target) || this.elements.button.contains(event.target)) return;
     this.close(false);

@@ -52,6 +52,8 @@ describe('TocPanelController', () => {
 
     expect(button.hidden).toBe(false);
     expect(list.querySelectorAll('.toc-list')).toHaveLength(2);
+    expect(list.querySelector<HTMLButtonElement>('[data-toc-target="chapter"]')?.title)
+      .toBe('Глава');
     button.click();
     (list.querySelector('[data-toc-target="chapter"]') as HTMLButtonElement).click();
 

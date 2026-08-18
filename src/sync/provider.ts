@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+
 export type ProviderId = 'google' | 'yandex';
 export type ProviderStatus = 'disconnected' | 'connecting' | 'connected' | 'syncing' | 'reconnect' | 'error';
 
@@ -72,11 +74,11 @@ export abstract class BaseCloudProvider implements CloudProvider {
   protected async response(response: Response, fallback: string): Promise<Response> {
     if (response.ok) return response;
     if (response.status === 401 || response.status === 403) {
-      this.setStatus('reconnect', 'Нужно переподключить');
-      throw new ProviderError('Авторизация истекла или была отозвана', 'authorization');
+      this.setStatus('reconnect', t('sync.needsReconnect'));
+      throw new ProviderError(t('error.authorizationExpired'), 'authorization');
     }
     if (response.status === 429 || response.status === 507) {
-      throw new ProviderError('Облачное хранилище временно недоступно или переполнено', 'quota');
+      throw new ProviderError(t('error.cloudQuota'), 'quota');
     }
     let detail = '';
     try {

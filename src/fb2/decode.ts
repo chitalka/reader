@@ -1,4 +1,5 @@
 import { unzip } from 'fflate';
+import { t } from '../i18n';
 
 export interface DecodedFb2Source {
   format: 'fb2';
@@ -38,7 +39,7 @@ function unzipAsync(bytes: Uint8Array): Promise<Record<string, Uint8Array>> {
   return new Promise((resolve, reject) => {
     unzip(bytes, (error, files) => {
       if (error) {
-        reject(new Error(`Не удалось распаковать архив: ${error.message}`));
+        reject(new Error(t('error.archiveUnpack', { message: error.message })));
         return;
       }
 
@@ -77,7 +78,7 @@ export function decodeXml(bytes: Uint8Array): string {
   try {
     return new TextDecoder(encoding).decode(bytes);
   } catch {
-    throw new Error(`Кодировка «${encoding}» не поддерживается браузером`);
+    throw new Error(t('error.encodingUnsupported', { encoding }));
   }
 }
 
@@ -85,7 +86,7 @@ export async function decodeBookBytes(bytes: Uint8Array, filename: string): Prom
   const fingerprintPromise = sha256(bytes);
   const epubFilename = /\.epub$/iu.test(filename);
   if (epubFilename && !hasZipSignature(bytes)) {
-    throw new Error('Некорректный EPUB: файл не является ZIP-архивом');
+    throw new Error(t('error.epubNotZip'));
   }
   const zipped = epubFilename || /\.zip$/iu.test(filename) || hasZipSignature(bytes);
   if (!zipped) {
@@ -108,7 +109,7 @@ export async function decodeBookBytes(bytes: Uint8Array, filename: string): Prom
   const entry = entries.find(([name]) => /\.fb2$/iu.test(name));
 
   if (!entry) {
-    throw new Error(entries.length ? 'Архив не содержит книгу FB2' : 'Архив пуст');
+    throw new Error(t(entries.length ? 'error.archiveNoFb2' : 'error.archiveEmpty'));
   }
 
   const [entryName, content] = entry;
@@ -129,7 +130,7 @@ export async function decodeBookUrl(url: URL): Promise<DecodedBookSource> {
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`Не удалось загрузить книгу: HTTP ${response.status}`);
+    throw new Error(t('error.bookDownload', { status: response.status }));
   }
 
   const filename = decodeURIComponent(url.pathname.split('/').pop() || 'book.fb2');

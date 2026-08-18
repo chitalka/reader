@@ -7,6 +7,7 @@ import {
   type Fb2TocItem,
   type ParsedBook,
 } from './model';
+import { t } from '../i18n';
 
 function authorName(author: Element): string {
   const parts = [
@@ -24,7 +25,7 @@ function metadataFromDocument(document: XMLDocument): BookMetadata {
   const documentInfo = description && childElement(description, 'document-info');
   const publishInfo = description && childElement(description, 'publish-info');
 
-  const title = normalizedText(titleInfo && childElement(titleInfo, 'book-title')) || 'Без названия';
+  const title = normalizedText(titleInfo && childElement(titleInfo, 'book-title')) || t('book.untitled');
   const authors = titleInfo
     ? childElements(titleInfo, 'author').map(authorName).filter(Boolean)
     : [];
@@ -59,11 +60,11 @@ export function parseFb2(xml: string): ParsedBook {
   const parserError = document.querySelector('parsererror');
 
   if (parserError) {
-    throw new Error(`Некорректный XML: ${normalizedText(parserError).slice(0, 180)}`);
+    throw new Error(t('error.xmlInvalid', { details: normalizedText(parserError).slice(0, 180) }));
   }
 
   if (document.documentElement.localName !== 'FictionBook') {
-    throw new Error('Файл не является книгой FB2');
+    throw new Error(t('error.notFb2'));
   }
 
   return {

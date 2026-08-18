@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f3efe7" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#191816" media="(prefers-color-scheme: dark)" />
+    <meta id="app-theme-color" name="theme-color" content="#f3efe7" />
     <meta
       name="description"
-      content="Читалка — локальная браузерная читалка для книг в форматах FB2 и EPUB"
+      content="Chitalka — a local browser reader for FB2 and EPUB books"
+      data-i18n-content="meta.description"
     />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png" />
@@ -17,16 +17,29 @@
     <link rel="preload" href="./icons/icon-192.png" as="image" type="image/png" />
     <script>
       (() => {
+        let settings = null;
         try {
-          const settings = JSON.parse(localStorage.getItem('chitalka:settings:v1') || 'null');
-          if (settings?.theme === 'light' || settings?.theme === 'dark') {
-            document.documentElement.dataset.theme = settings.theme;
-            return;
-          }
-        } catch {}
-        if (matchMedia('(prefers-color-scheme: dark)').matches) {
-          document.documentElement.dataset.theme = 'dark';
+          settings = JSON.parse(localStorage.getItem('chitalka:settings:v1') || 'null');
+        } catch {
+          settings = null;
         }
+        const language = settings?.language === 'ru' ? 'ru' : 'en';
+        document.documentElement.lang = language;
+        document.documentElement.dataset.language = language;
+        document.querySelector('link[rel="manifest"]').href = language === 'ru'
+          ? './manifest.ru.webmanifest'
+          : './manifest.webmanifest';
+        const theme = settings?.theme === 'light' || settings?.theme === 'dark'
+          ? settings.theme
+          : 'auto';
+        const effectiveTheme = theme === 'auto'
+          ? matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+          : theme;
+        document.documentElement.dataset.themeMode = theme;
+        document.documentElement.dataset.theme = effectiveTheme;
+        document.querySelector('#app-theme-color').content = effectiveTheme === 'dark'
+          ? '#191816'
+          : '#f3efe7';
       })();
     </script>
     <style>
@@ -114,7 +127,7 @@
         }
       }
     </style>
-    <title>Читалка</title>
+    <title>Chitalka</title>
   </head>
   <body>
     <div id="app-splash" class="app-splash" role="status" aria-live="polite" aria-atomic="true">
@@ -127,13 +140,13 @@
           alt=""
           aria-hidden="true"
         />
-        <p id="app-splash-label" class="app-splash__label">Открываем книгу…</p>
+        <p id="app-splash-label" class="app-splash__label" data-i18n="app.openingBook">Opening book…</p>
       </div>
     </div>
 
     <div id="app" inert aria-hidden="true">
       <header id="app-header" class="app-header">
-        <a class="brand" href="./" aria-label="Читалка — на главную">
+        <a class="brand" href="./" aria-label="Chitalka — home" data-i18n-aria-label="app.home">
           <img
             class="brand-mascot"
             src="./icons/icon-192.png"
@@ -145,7 +158,7 @@
         </a>
 
         <div class="book-heading" aria-live="polite">
-          <strong id="book-title">Открываем библиотеку…</strong>
+          <strong id="book-title">Opening library…</strong>
           <span id="book-author"></span>
         </div>
 
@@ -154,7 +167,10 @@
             id="toc-button"
             class="icon-button"
             type="button"
-            aria-label="Оглавление"
+            aria-label="Table of contents"
+            data-i18n-aria-label="header.toc"
+            title="Table of contents"
+            data-i18n-title="header.toc"
             aria-haspopup="dialog"
             aria-controls="toc-panel"
             aria-expanded="false"
@@ -169,7 +185,10 @@
             id="annotations-button"
             class="icon-button"
             type="button"
-            aria-label="Закладки и цитаты"
+            aria-label="Bookmarks and quotes"
+            data-i18n-aria-label="header.annotations"
+            title="Bookmarks and quotes"
+            data-i18n-title="header.annotations"
             aria-haspopup="dialog"
             aria-controls="annotations-panel"
             aria-expanded="false"
@@ -183,7 +202,10 @@
             id="settings-button"
             class="icon-button"
             type="button"
-            aria-label="Настройки чтения"
+            aria-label="Reading settings"
+            data-i18n-aria-label="header.settings"
+            title="Reading settings"
+            data-i18n-title="header.settings"
             aria-haspopup="dialog"
             aria-controls="settings-panel"
             aria-expanded="false"
@@ -193,16 +215,26 @@
               <circle cx="12" cy="12" r="3" />
             </svg>
           </button>
+          <label class="language-select" data-language-switcher title="Interface language" data-i18n-title="language.label">
+            <span id="language-select-label" class="visually-hidden" data-i18n="language.label">Interface language</span>
+            <select id="language-select" aria-labelledby="language-select-label">
+              <option value="en">En</option>
+              <option value="ru">Ru</option>
+            </select>
+            <svg viewBox="0 0 12 8" aria-hidden="true"><path d="m1 1.5 5 5 5-5" /></svg>
+          </label>
           <input
             id="book-file"
             class="visually-hidden"
             type="file"
-            aria-label="Открыть книгу"
+            aria-label="Open book"
+            data-i18n-aria-label="header.openBook"
             accept=".fb2,.zip,.epub,application/xml,text/xml,application/zip,application/epub+zip"
           />
-          <label class="open-button" for="book-file">
-            <span class="open-button-label">Открыть книгу</span>
-            <span class="open-button-icon" aria-hidden="true">+</span>
+          <label class="open-button" for="book-file" title="Open book" data-i18n-title="header.openBook">
+            <svg class="upload-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 16V4m-4 4 4-4 4 4M5 14v5h14v-5" />
+            </svg>
           </label>
         </div>
       </header>
@@ -216,12 +248,12 @@
         hidden
       >
         <div class="toc-panel-header">
-          <h2 id="toc-title">Оглавление</h2>
-          <button id="toc-close" class="panel-close" type="button" aria-label="Закрыть оглавление">
+          <h2 id="toc-title" data-i18n="toc.title">Table of contents</h2>
+          <button id="toc-close" class="panel-close" type="button" aria-label="Close table of contents" data-i18n-aria-label="toc.close" title="Close table of contents" data-i18n-title="toc.close">
             <span aria-hidden="true">×</span>
           </button>
         </div>
-        <nav id="toc-list-root" class="toc-navigation" aria-label="Разделы книги"></nav>
+        <nav id="toc-list-root" class="toc-navigation" aria-label="Book sections" data-i18n-aria-label="toc.sections"></nav>
       </section>
 
       <div id="annotations-backdrop" class="panel-backdrop annotations-backdrop" hidden></div>
@@ -233,22 +265,22 @@
         hidden
       >
         <div class="annotations-panel-header">
-          <h2 id="annotations-title">Закладки и цитаты</h2>
-          <button id="annotations-close" class="panel-close" type="button" aria-label="Закрыть закладки">
+          <h2 id="annotations-title" data-i18n="annotations.title">Bookmarks and quotes</h2>
+          <button id="annotations-close" class="panel-close" type="button" aria-label="Close bookmarks and quotes" data-i18n-aria-label="annotations.close" title="Close bookmarks and quotes" data-i18n-title="annotations.close">
             <span aria-hidden="true">×</span>
           </button>
         </div>
-        <div class="annotation-tabs" role="tablist" aria-label="Сохранённые места">
-          <button id="bookmarks-tab" type="button" role="tab" aria-selected="true" aria-controls="bookmarks-view">
-            Закладки
+        <div class="annotation-tabs" role="tablist" aria-label="Saved places" data-i18n-aria-label="annotations.savedPlaces">
+          <button id="bookmarks-tab" type="button" role="tab" aria-selected="true" aria-controls="bookmarks-view" title="Bookmarks" data-i18n-title="annotations.bookmarks">
+            <span data-i18n="annotations.bookmarks">Bookmarks</span>
           </button>
-          <button id="quotes-tab" type="button" role="tab" aria-selected="false" aria-controls="quotes-view" tabindex="-1">
-            Цитаты
+          <button id="quotes-tab" type="button" role="tab" aria-selected="false" aria-controls="quotes-view" tabindex="-1" title="Quotes" data-i18n-title="annotations.quotes">
+            <span data-i18n="annotations.quotes">Quotes</span>
           </button>
         </div>
         <div id="bookmarks-view" class="annotation-view" role="tabpanel" aria-labelledby="bookmarks-tab">
-          <button id="add-bookmark" class="annotation-primary-action" type="button">
-            Добавить текущее место
+          <button id="add-bookmark" class="annotation-primary-action" type="button" title="Add current location" data-i18n-title="annotations.addCurrent">
+            <span data-i18n="annotations.addCurrent">Add current location</span>
           </button>
           <div id="bookmarks-list" class="annotation-list"></div>
         </div>
@@ -256,16 +288,16 @@
           <div id="quotes-list" class="annotation-list"></div>
         </div>
         <form id="annotation-editor" class="annotation-editor" hidden>
-          <h3 id="annotation-editor-title">Редактировать</h3>
-          <div id="annotation-editor-colors" class="annotation-colors" role="radiogroup" aria-label="Цвет"></div>
+          <h3 id="annotation-editor-title">Edit</h3>
+          <div id="annotation-editor-colors" class="annotation-colors" role="radiogroup" aria-label="Color" data-i18n-aria-label="annotations.color"></div>
           <label>
-            <span>Заметка</span>
-            <textarea id="annotation-editor-note" rows="4" maxlength="2000" placeholder="Необязательно"></textarea>
+            <span data-i18n="annotations.note">Note</span>
+            <textarea id="annotation-editor-note" rows="4" maxlength="2000" placeholder="Optional" data-i18n-placeholder="annotations.optional"></textarea>
           </label>
           <div class="annotation-editor-actions">
-            <button id="annotation-editor-delete" class="annotation-delete" type="button">Удалить</button>
-            <button id="annotation-editor-cancel" type="button">Отмена</button>
-            <button class="annotation-save" type="submit">Сохранить</button>
+            <button id="annotation-editor-delete" class="annotation-delete" type="button" data-i18n="annotations.delete" title="Delete" data-i18n-title="annotations.delete">Delete</button>
+            <button id="annotation-editor-cancel" type="button" data-i18n="annotations.cancel" title="Cancel" data-i18n-title="annotations.cancel">Cancel</button>
+            <button class="annotation-save" type="submit" data-i18n="annotations.save" title="Save" data-i18n-title="annotations.save">Save</button>
           </div>
         </form>
       </section>
@@ -279,41 +311,45 @@
         hidden
       >
         <div class="settings-panel-header">
-          <h2 id="settings-title">Настройки чтения</h2>
-          <button id="settings-close" class="settings-close" type="button" aria-label="Закрыть настройки">
+          <h2 id="settings-title" data-i18n="settings.title">Reading settings</h2>
+          <button id="settings-close" class="settings-close" type="button" aria-label="Close settings" data-i18n-aria-label="settings.close" title="Close settings" data-i18n-title="settings.close">
             <span aria-hidden="true">×</span>
           </button>
         </div>
 
         <fieldset class="settings-group">
-          <legend>Размер шрифта</legend>
+          <legend data-i18n="settings.fontSize">Font size</legend>
           <div class="font-size-control">
-            <button id="font-down" class="setting-step" type="button" aria-label="Уменьшить шрифт">A−</button>
+            <button id="font-down" class="setting-step" type="button" aria-label="Decrease font size" data-i18n-aria-label="settings.fontDecrease" title="Decrease font size" data-i18n-title="settings.fontDecrease">A−</button>
             <output id="font-size-value" aria-live="polite">18 px</output>
-            <button id="font-up" class="setting-step" type="button" aria-label="Увеличить шрифт">A+</button>
+            <button id="font-up" class="setting-step" type="button" aria-label="Increase font size" data-i18n-aria-label="settings.fontIncrease" title="Increase font size" data-i18n-title="settings.fontIncrease">A+</button>
           </div>
         </fieldset>
 
         <fieldset class="settings-group">
-          <legend>Тема</legend>
+          <legend data-i18n="settings.theme">Theme</legend>
           <div class="segmented-control">
             <label class="setting-option">
               <input type="radio" name="theme" value="light" />
-              <span>Светлая</span>
+              <span data-i18n="settings.themeLight">Light</span>
+            </label>
+            <label class="setting-option">
+              <input type="radio" name="theme" value="auto" />
+              <span data-i18n="settings.themeAuto">Auto</span>
             </label>
             <label class="setting-option">
               <input type="radio" name="theme" value="dark" />
-              <span>Тёмная</span>
+              <span data-i18n="settings.themeDark">Dark</span>
             </label>
           </div>
         </fieldset>
 
         <fieldset class="settings-group">
-          <legend>Количество страниц</legend>
+          <legend data-i18n="settings.pageCount">Pages per view</legend>
           <div class="segmented-control">
             <label class="setting-option">
               <input type="radio" name="page-mode" value="auto" />
-              <span>Авто</span>
+              <span data-i18n="settings.auto">Auto</span>
             </label>
             <label class="setting-option">
               <input type="radio" name="page-mode" value="one" />
@@ -327,101 +363,102 @@
         </fieldset>
 
         <fieldset class="settings-group">
-          <legend>Сноски</legend>
+          <legend data-i18n="settings.footnotes">Footnotes</legend>
           <div class="segmented-control">
             <label class="setting-option">
               <input type="radio" name="footnote-mode" value="appendix" />
-              <span>В конце</span>
+              <span data-i18n="settings.footnotesAppendix">At the end</span>
             </label>
             <label class="setting-option">
               <input type="radio" name="footnote-mode" value="inline" />
-              <span>В тексте</span>
+              <span data-i18n="settings.footnotesInline">In the text</span>
             </label>
           </div>
         </fieldset>
 
         <fieldset class="settings-group">
-          <legend>Стрелки перелистывания</legend>
+          <legend data-i18n="settings.pageArrows">Page-turn arrows</legend>
           <div class="segmented-control">
             <label class="setting-option">
               <input type="radio" name="page-buttons" value="auto" />
-              <span>Авто</span>
+              <span data-i18n="settings.auto">Auto</span>
             </label>
             <label class="setting-option">
               <input type="radio" name="page-buttons" value="show" />
-              <span>Показывать</span>
+              <span data-i18n="settings.show">Show</span>
             </label>
             <label class="setting-option">
               <input type="radio" name="page-buttons" value="hide" />
-              <span>Скрывать</span>
+              <span data-i18n="settings.hide">Hide</span>
             </label>
           </div>
         </fieldset>
 
         <fieldset class="settings-group sync-settings">
-          <legend>Синхронизация</legend>
+          <legend data-i18n="sync.title">Synchronization</legend>
           <ul class="settings-help sync-help">
-            <li>Позиция чтения, настройки, закладки и цитаты.</li>
-            <li>Автоматически после изменений и периодически.</li>
-            <li>Совпадающие данные объединяются; при конфликте сохраняется последняя версия.</li>
-            <li>Подключение необязательно; книги не загружаются.</li>
+            <li data-i18n="sync.helpData">Reading position, settings, bookmarks, and quotes.</li>
+            <li data-i18n="sync.helpAutomatic">Automatically after changes and periodically.</li>
+            <li data-i18n="sync.helpMerge">Matching data is merged; the latest version wins conflicts.</li>
+            <li data-i18n="sync.helpOptional">Connection is optional; books are never uploaded.</li>
           </ul>
           <div class="sync-provider">
             <div>
               <strong>Google Drive</strong>
-              <span id="google-sync-status">Не подключён</span>
+              <span id="google-sync-status">Not connected</span>
             </div>
-            <button id="google-connect" type="button" aria-label="Подключить Google Drive">Подключить</button>
+            <button id="google-connect" type="button" aria-label="Connect Google Drive" title="Connect Google Drive">Connect</button>
           </div>
           <div class="sync-provider">
             <div>
-              <strong>Яндекс.Диск</strong>
-              <span id="yandex-sync-status">Не подключён</span>
+              <strong data-i18n="sync.yandex">Yandex Disk</strong>
+              <span id="yandex-sync-status">Not connected</span>
             </div>
-            <button id="yandex-connect" type="button" aria-label="Подключить Яндекс.Диск">Подключить</button>
+            <button id="yandex-connect" type="button" aria-label="Connect Yandex Disk" title="Connect Yandex Disk">Connect</button>
           </div>
           <div class="sync-summary">
-            <span id="sync-last-time">Синхронизации ещё не было</span>
-            <button id="sync-now" type="button" disabled>Синхронизировать</button>
+            <span id="sync-last-time">Not synchronized yet</span>
+            <button id="sync-now" type="button" disabled data-i18n="sync.now" title="Synchronize now" data-i18n-title="sync.now">Synchronize now</button>
           </div>
         </fieldset>
       </section>
 
       <main id="drop-zone" class="reader-shell" aria-busy="true">
         <section id="reader-status" class="reader-status" role="status">
-          <p id="status-message">Загружаем демонстрационную книгу…</p>
+          <p id="status-message">Loading the demo book…</p>
         </section>
 
-        <section id="reader" class="reader" hidden aria-label="Текст книги">
+        <section id="reader" class="reader" hidden aria-label="Book text" data-i18n-aria-label="reader.text">
           <div id="book-viewport" class="book-viewport">
             <article id="book-content" class="book-content"></article>
           </div>
 
-          <button id="back-to-text" class="back-to-text" type="button" hidden>
-            Вернуться к тексту
+          <button id="back-to-text" class="back-to-text" type="button" hidden title="Back to text" data-i18n-title="reader.backToText">
+            <span data-i18n="reader.backToText">Back to text</span>
           </button>
 
           <footer class="reader-footer">
-            <div class="paging-controls" aria-label="Навигация по книге">
-              <button id="previous-page" class="page-button" type="button" aria-label="Предыдущая страница">
+            <div class="paging-controls" aria-label="Book navigation" data-i18n-aria-label="reader.navigation">
+              <button id="previous-page" class="page-button" type="button" aria-label="Previous page" data-i18n-aria-label="reader.previousPage" title="Previous page" data-i18n-title="reader.previousPage">
                 <span aria-hidden="true">←</span>
               </button>
-              <button id="next-page" class="page-button" type="button" aria-label="Следующая страница">
+              <button id="next-page" class="page-button" type="button" aria-label="Next page" data-i18n-aria-label="reader.nextPage" title="Next page" data-i18n-title="reader.nextPage">
                 <span aria-hidden="true">→</span>
               </button>
             </div>
 
             <div id="progress-group" class="progress-group" aria-busy="true">
               <div class="progress-copy">
-                <span id="page-label">Страница 1 из 1</span>
-                <span id="time-label">До конца меньше минуты</span>
+                <span id="page-label">Page 1 of 1</span>
+                <span id="time-label">Less than a minute left</span>
               </div>
               <progress id="book-progress" max="100" value="0">0%</progress>
               <span
                 id="pagination-placeholder"
                 class="pagination-placeholder"
                 role="status"
-                aria-label="Считаем страницы"
+                aria-label="Counting pages"
+                data-i18n-aria-label="reader.countingPages"
                 hidden
               >
                 <span class="pagination-placeholder-dots" aria-hidden="true"></span>
@@ -433,25 +470,25 @@
 
         <div id="drop-overlay" class="drop-overlay" hidden>
           <div>
-            <strong>Отпустите книгу здесь</strong>
-            <span>Поддерживаются FB2, FB2.ZIP и EPUB</span>
+            <strong data-i18n="reader.dropBook">Drop the book here</strong>
+            <span data-i18n="reader.supportedFormats">FB2, FB2.ZIP, and EPUB are supported</span>
           </div>
         </div>
       </main>
 
       <div id="toast" class="toast" role="alert" hidden></div>
 
-      <form id="quote-menu" class="quote-menu" role="dialog" aria-label="Сохранить цитату" hidden>
-        <button id="quote-menu-close" class="quote-menu-close" type="button" aria-label="Закрыть">×</button>
+      <form id="quote-menu" class="quote-menu" role="dialog" aria-label="Save quote" data-i18n-aria-label="annotations.saveQuote" hidden>
+        <button id="quote-menu-close" class="quote-menu-close" type="button" aria-label="Close" data-i18n-aria-label="annotations.closeQuote">×</button>
         <p id="quote-menu-preview" class="quote-menu-preview"></p>
-        <div id="quote-menu-colors" class="annotation-colors" role="radiogroup" aria-label="Цвет цитаты"></div>
+        <div id="quote-menu-colors" class="annotation-colors" role="radiogroup" aria-label="Quote color" data-i18n-aria-label="annotations.quoteColor"></div>
         <label>
-          <span>Заметка</span>
-          <textarea id="quote-menu-note" rows="3" maxlength="2000" placeholder="Необязательно"></textarea>
+          <span data-i18n="annotations.note">Note</span>
+          <textarea id="quote-menu-note" rows="3" maxlength="2000" placeholder="Optional" data-i18n-placeholder="annotations.optional"></textarea>
         </label>
         <div class="quote-menu-actions">
-          <button id="quote-menu-delete" class="annotation-delete" type="button" hidden>Удалить</button>
-          <button id="quote-menu-save" class="annotation-save" type="submit">Сохранить цитату</button>
+          <button id="quote-menu-delete" class="annotation-delete" type="button" hidden data-i18n="annotations.delete">Delete</button>
+          <button id="quote-menu-save" class="annotation-save" type="submit">Save quote</button>
         </div>
       </form>
     </div>

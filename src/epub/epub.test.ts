@@ -263,7 +263,7 @@ describe('EPUB support', () => {
         <spine><itemref idref="chapter" /></spine>
       </package>`);
 
-    expect(() => parseEpubArchive(files)).toThrow('фиксированной вёрсткой');
+    expect(() => parseEpubArchive(files)).toThrow('Fixed-layout EPUB');
   });
 
   it('rejects encrypted reading content', () => {
@@ -280,7 +280,7 @@ describe('EPUB support', () => {
         </encryption>`),
     });
 
-    expect(() => parseEpubArchive(files)).toThrow('DRM или зашифрованным содержимым');
+    expect(() => parseEpubArchive(files)).toThrow('DRM-protected or encrypted EPUB');
   });
 
   it('allows obfuscated fonts because publication fonts are not loaded', () => {
@@ -305,18 +305,18 @@ describe('EPUB support', () => {
   });
 
   it('reports a missing container and an empty spine', () => {
-    expect(() => parseEpubArchive({})).toThrow('отсутствует META-INF/container.xml');
+    expect(() => parseEpubArchive({})).toThrow('META-INF/container.xml is missing');
     const files = minimalArchive(`<?xml version="1.0"?>
       <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
         <metadata />
         <manifest />
         <spine />
       </package>`);
-    expect(() => parseEpubArchive(files)).toThrow('порядок чтения spine пуст');
+    expect(() => parseEpubArchive(files)).toThrow('reading order is empty');
   });
 
   it('reports a non-ZIP EPUB file', async () => {
     await expect(decodeBookBytes(xml('not a zip'), 'broken.epub'))
-      .rejects.toThrow('не является ZIP-архивом');
+      .rejects.toThrow('not a ZIP archive');
   });
 });

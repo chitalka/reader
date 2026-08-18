@@ -6,6 +6,7 @@ import {
   type BookmarkRecord,
   type QuoteRecord,
 } from './reader/state';
+import { t, type TranslationKey } from './i18n';
 
 type AnnotationRecord = BookmarkRecord | QuoteRecord;
 
@@ -39,15 +40,15 @@ export interface AnnotationPanelActions {
 }
 
 function colorLabel(color: AnnotationColor): string {
-  const labels: Record<AnnotationColor, string> = {
-    purple: 'Фиолетовый',
-    blue: 'Синий',
-    green: 'Зелёный',
-    yellow: 'Жёлтый',
-    orange: 'Оранжевый',
-    pink: 'Розовый',
+  const labels: Record<AnnotationColor, TranslationKey> = {
+    purple: 'color.purple',
+    blue: 'color.blue',
+    green: 'color.green',
+    yellow: 'color.yellow',
+    orange: 'color.orange',
+    pink: 'color.pink',
   };
-  return labels[color];
+  return t(labels[color]);
 }
 
 export class ColorPicker {
@@ -72,6 +73,12 @@ export class ColorPicker {
 
   get selected(): AnnotationColor {
     return this.value;
+  }
+
+  refreshLanguage(): void {
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-color]')) {
+      button.setAttribute('aria-label', colorLabel(button.dataset.color as AnnotationColor));
+    }
   }
 
   set(color: AnnotationColor): void {
@@ -140,9 +147,41 @@ export class AnnotationPanelController {
 
   setCurrentBookmark(record: BookmarkRecord | undefined): void {
     this.currentBookmark = record;
-    this.elements.addBookmarkButton.textContent = record
-      ? 'Закладка в этом месте сохранена'
-      : 'Добавить текущее место';
+    const label = record
+      ? t('annotations.currentSaved')
+      : t('annotations.addCurrent');
+    this.elements.addBookmarkButton.textContent = label;
+    this.elements.addBookmarkButton.title = label;
+  }
+
+  refreshLanguage(): void {
+    this.colors.refreshLanguage();
+    this.setCurrentBookmark(this.currentBookmark);
+    for (const [root, records, emptyKey] of [
+      [this.elements.bookmarksList, this.bookmarks, 'annotations.noBookmarks'],
+      [this.elements.quotesList, this.quotes, 'annotations.noQuotes'],
+    ] as const) {
+      root.querySelector<HTMLElement>('.annotation-empty')?.replaceChildren(t(emptyKey));
+      for (const card of root.querySelectorAll<HTMLElement>('[data-annotation-id]')) {
+        const record = records.find((candidate) => candidate.id === card.dataset.annotationId);
+        if (!record) continue;
+        const edit = card.querySelector<HTMLButtonElement>('.annotation-card-edit');
+        edit?.setAttribute('aria-label', t('annotations.edit'));
+        if (record.kind === 'bookmark' && !record.chapter) {
+          const title = card.querySelector<HTMLElement>('.annotation-card-main strong');
+          if (title) title.textContent = t('annotations.position', {
+            progress: Math.max(1, Math.round(record.progress)),
+          });
+        }
+        if (record.kind === 'bookmark') {
+          const main = card.querySelector<HTMLButtonElement>('.annotation-card-main');
+          const title = main?.querySelector('strong')?.textContent?.trim();
+          if (main && title) main.title = title;
+          if (edit) edit.title = t('annotations.edit');
+        }
+      }
+    }
+    this.renderEditorTitle();
   }
 
   edit(record: AnnotationRecord): void {
@@ -185,8 +224,8 @@ export class AnnotationPanelController {
   private render(): void {
     this.elements.bookmarksList.replaceChildren(...this.cards(this.bookmarks));
     this.elements.quotesList.replaceChildren(...this.cards(this.quotes));
-    if (!this.bookmarks.length) this.elements.bookmarksList.append(this.empty('Закладок пока нет'));
-    if (!this.quotes.length) this.elements.quotesList.append(this.empty('Цитат пока нет'));
+    if (!this.bookmarks.length) this.elements.bookmarksList.append(this.empty(t('annotations.noBookmarks')));
+    if (!this.quotes.length) this.elements.quotesList.append(this.empty(t('annotations.noQuotes')));
   }
 
   private cards(records: AnnotationRecord[]): HTMLElement[] {
@@ -208,7 +247,9 @@ export class AnnotationPanelController {
       const title = document.createElement('strong');
       title.textContent = record.kind === 'quote'
         ? record.exact.replace(/\s+/gu, ' ').trim()
-        : record.chapter || `Позиция ${Math.max(1, Math.round(record.progress))}%`;
+        : record.chapter || t('annotations.position', {
+          progress: Math.max(1, Math.round(record.progress)),
+        });
       const details = document.createElement('span');
       details.textContent = [
         record.kind === 'quote' ? record.chapter : undefined,
@@ -216,12 +257,14 @@ export class AnnotationPanelController {
         `${Math.max(0, Math.min(100, Math.round(record.progress)))}%`,
       ].filter(Boolean).join(' · ');
       main.append(title, details);
+      if (record.kind === 'bookmark') main.title = title.textContent;
 
       const edit = document.createElement('button');
       edit.type = 'button';
       edit.className = 'annotation-card-edit';
       edit.dataset.annotationAction = 'edit';
-      edit.setAttribute('aria-label', 'Редактировать');
+      edit.setAttribute('aria-label', t('annotations.edit'));
+      if (record.kind === 'bookmark') edit.title = t('annotations.edit');
       edit.textContent = '•••';
       card.append(color, main, edit);
       return card;
@@ -246,9 +289,7 @@ export class AnnotationPanelController {
 
   private openEditor(record: AnnotationRecord | 'new-bookmark'): void {
     this.editing = record;
-    this.elements.editorTitle.textContent = record === 'new-bookmark'
-      ? 'Новая закладка'
-      : record.kind === 'quote' ? 'Редактировать цитату' : 'Редактировать закладку';
+    this.renderEditorTitle();
     this.elements.editorNote.value = record === 'new-bookmark' ? '' : record.note;
     this.colors.set(record === 'new-bookmark' ? 'purple' : record.color);
     this.elements.editorDelete.hidden = record === 'new-bookmark';
@@ -259,6 +300,13 @@ export class AnnotationPanelController {
   private closeEditor(): void {
     this.editing = undefined;
     this.editorMotion.hide();
+  }
+
+  private renderEditorTitle(): void {
+    if (!this.editing) return;
+    this.elements.editorTitle.textContent = this.editing === 'new-bookmark'
+      ? t('annotations.newBookmark')
+      : t(this.editing.kind === 'quote' ? 'annotations.editQuote' : 'annotations.editBookmark');
   }
 
   private readonly handleToggle = (): void => this.isOpen ? this.close() : this.open();
@@ -302,6 +350,7 @@ export class AnnotationPanelController {
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
     if (!this.isOpen || !(event.target instanceof Node)) return;
+    if (event.target instanceof Element && event.target.closest('[data-language-switcher]')) return;
     if (this.elements.panel.contains(event.target) || this.elements.button.contains(event.target)) return;
     if (event.target === this.elements.backdrop) return;
     this.close(false);
@@ -392,6 +441,15 @@ export class QuoteMenuController {
     return this.isOpen;
   }
 
+  refreshLanguage(): void {
+    this.colors.refreshLanguage();
+    if (this.opened) {
+      this.elements.saveButton.textContent = t(
+        this.existing ? 'annotations.saveChanges' : 'annotations.saveQuote',
+      );
+    }
+  }
+
   open(selection: LocatedSelection, existing?: QuoteRecord): void {
     this.isOpen = true;
     this.selection = selection;
@@ -399,7 +457,9 @@ export class QuoteMenuController {
     this.elements.preview.textContent = selection.exact.replace(/\s+/gu, ' ').trim();
     this.elements.note.value = existing?.note ?? '';
     this.colors.set(existing?.color ?? 'purple');
-    this.elements.saveButton.textContent = existing ? 'Сохранить изменения' : 'Сохранить цитату';
+    this.elements.saveButton.textContent = t(
+      existing ? 'annotations.saveChanges' : 'annotations.saveQuote',
+    );
     this.elements.deleteButton.hidden = !existing;
     this.motion.show(() => this.position(selection.range));
     this.previewHighlight.show(selection.range, this.colors.selected);
@@ -456,6 +516,7 @@ export class QuoteMenuController {
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
     if (!this.opened || !(event.target instanceof Node)) return;
+    if (event.target instanceof Element && event.target.closest('[data-language-switcher]')) return;
     if (this.elements.form.contains(event.target)) return;
     if ((event.target as Element).closest?.('[data-reader-quote]')) return;
     this.close();

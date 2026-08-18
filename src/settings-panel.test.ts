@@ -22,6 +22,7 @@ describe('SettingsPanelController', () => {
     })));
     document.body.innerHTML = `
       <button id="settings-button" aria-expanded="false">Настройки</button>
+      <div data-language-switcher><button id="language-button">Ru</button></div>
       <div id="settings-backdrop" hidden></div>
       <section id="settings-panel" hidden>
         <button id="settings-close">Закрыть</button>
@@ -68,6 +69,16 @@ describe('SettingsPanelController', () => {
     document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
 
     expect(panel.hidden).toBe(true);
+  });
+
+  it('stays open when the interface language changes', () => {
+    button.click();
+    document.querySelector('#language-button')?.dispatchEvent(
+      new Event('pointerdown', { bubbles: true }),
+    );
+
+    expect(panel.hidden).toBe(false);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
   });
 
   it('shows a modal backdrop on mobile', () => {

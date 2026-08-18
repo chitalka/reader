@@ -1,4 +1,5 @@
 import { VisibilityMotion } from './motion';
+import { t } from './i18n';
 
 type FrameScheduler = (callback: FrameRequestCallback) => number;
 
@@ -46,7 +47,7 @@ function frameScheduler(scheduleFrame?: FrameScheduler): FrameScheduler {
 }
 
 export async function showLoadingOverlay(
-  message = 'Открываем книгу…',
+  message = t('app.openingBook'),
   scheduleFrame?: FrameScheduler,
 ): Promise<void> {
   const { app, label, splash } = elements();

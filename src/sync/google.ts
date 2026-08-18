@@ -1,4 +1,5 @@
 import { BaseCloudProvider, ProviderError, type RemoteDocument } from './provider';
+import { t } from '../i18n';
 
 interface GoogleTokenResponse {
   access_token?: string;
@@ -40,7 +41,7 @@ function loadGoogleScript(): Promise<void> {
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${GOOGLE_SCRIPT}"]`);
     if (existing) {
       existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error('Не удалось загрузить Google Identity Services')), {
+      existing.addEventListener('error', () => reject(new Error(t('error.gisLoad'))), {
         once: true,
       });
       return;
@@ -49,7 +50,7 @@ function loadGoogleScript(): Promise<void> {
     script.src = GOOGLE_SCRIPT;
     script.async = true;
     script.addEventListener('load', () => resolve(), { once: true });
-    script.addEventListener('error', () => reject(new Error('Не удалось загрузить Google Identity Services')), {
+    script.addEventListener('error', () => reject(new Error(t('error.gisLoad'))), {
       once: true,
     });
     document.head.append(script);
@@ -69,21 +70,24 @@ export class GoogleDriveProvider extends BaseCloudProvider {
 
   async connect(): Promise<void> {
     if (!this.clientId) {
-      this.setStatus('error', 'Не задан Client ID');
-      throw new ProviderError('Для Google Drive не задан VITE_GOOGLE_CLIENT_ID', 'configuration');
+      this.setStatus('error', t('sync.clientIdRequired'));
+      throw new ProviderError(t('error.clientIdMissing', {
+        provider: 'Google Drive',
+        variable: 'VITE_GOOGLE_CLIENT_ID',
+      }), 'configuration');
     }
     this.setStatus('connecting');
     try {
       await loadGoogleScript();
       const oauth = window.google?.accounts.oauth2;
-      if (!oauth) throw new ProviderError('Google Identity Services не загрузился', 'network');
+      if (!oauth) throw new ProviderError(t('error.gisUnavailable'), 'network');
       const response = await new Promise<GoogleTokenResponse>((resolve, reject) => {
         const client = oauth.initTokenClient({
           client_id: this.clientId!,
           scope: DRIVE_SCOPE,
           callback: resolve,
           error_callback: (error) => reject(new ProviderError(
-            `Google OAuth не завершён${error.type ? `: ${error.type}` : ''}`,
+            t('error.googleOauth', { details: error.type ? `: ${error.type}` : '' }),
             'authorization',
           )),
         });
@@ -91,7 +95,7 @@ export class GoogleDriveProvider extends BaseCloudProvider {
       });
       if (!response.access_token || response.error) {
         throw new ProviderError(
-          response.error_description || response.error || 'Google не выдал токен',
+          response.error_description || response.error || t('error.googleNoToken'),
           'authorization',
         );
       }
@@ -99,7 +103,7 @@ export class GoogleDriveProvider extends BaseCloudProvider {
       this.expiresAt = Date.now() + Math.max(0, (response.expires_in ?? 3600) - 30) * 1000;
       this.setStatus('connected');
     } catch (error) {
-      this.setStatus('error', error instanceof Error ? error.message : 'Ошибка подключения');
+      this.setStatus('error', error instanceof Error ? error.message : t('error.connection'));
       throw error;
     }
   }
@@ -128,7 +132,7 @@ export class GoogleDriveProvider extends BaseCloudProvider {
       if (pageToken) parameters.set('pageToken', pageToken);
       const response = await this.response(await fetch(`${DRIVE_API}/files?${parameters}`, {
         headers: { Authorization: `Bearer ${token}` },
-      }), 'Не удалось получить данные Google Drive');
+      }), t('error.googleList'));
       const body = await response.json() as {
         nextPageToken?: string;
         files?: Array<{ id: string; name: string; modifiedTime?: string; size?: string }>;
@@ -148,7 +152,7 @@ export class GoogleDriveProvider extends BaseCloudProvider {
     const response = await this.response(await fetch(
       `${DRIVE_API}/files/${encodeURIComponent(document.id)}?alt=media`,
       { headers: { Authorization: `Bearer ${this.token()}` } },
-    ), 'Не удалось скачать снимок Google Drive');
+    ), t('error.googleDownload'));
     return response.text();
   }
 
@@ -170,21 +174,21 @@ export class GoogleDriveProvider extends BaseCloudProvider {
         },
         body,
       },
-    ), 'Не удалось загрузить снимок в Google Drive');
+    ), t('error.googleUpload'));
   }
 
   async delete(document: RemoteDocument): Promise<void> {
     await this.response(await fetch(`${DRIVE_API}/files/${encodeURIComponent(document.id)}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${this.token()}` },
-    }), 'Не удалось удалить старый снимок Google Drive');
+    }), t('error.googleDelete'));
   }
 
   private token(): string {
     if (!this.accessToken || Date.now() >= this.expiresAt) {
       this.accessToken = undefined;
-      this.setStatus('reconnect', 'Нужно переподключить');
-      throw new ProviderError('Токен Google Drive истёк', 'authorization');
+      this.setStatus('reconnect', t('sync.needsReconnect'));
+      throw new ProviderError(t('error.googleTokenExpired'), 'authorization');
     }
     return this.accessToken;
   }

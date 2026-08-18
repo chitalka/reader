@@ -1,8 +1,8 @@
 {
-  "name": "Chitalka",
-  "short_name": "Chitalka",
-  "description": "A local browser reader for FB2 and EPUB books",
-  "lang": "en",
+  "name": "Читалка",
+  "short_name": "Читалка",
+  "description": "Локальная браузерная читалка для книг в форматах FB2 и EPUB",
+  "lang": "ru",
   "dir": "ltr",
   "id": "./",
   "start_url": "./",
