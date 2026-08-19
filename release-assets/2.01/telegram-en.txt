@@ -1,0 +1,14 @@
+Chitalka 2.01
+
+A major reading interface update:
+• consistent compact popovers for contents, settings, bookmarks, and quotes;
+• a calm dark theme with a restrained purple accent;
+• unified controls, typography, borders, hover, and keyboard focus;
+• book percentage, page number, and remaining time in the bottom bar;
+• interface language moved into settings;
+• a shorter quote-saving flow with an explicitly optional note.
+
+We also fixed header hover after page turns, popover overlaps, and regressions in the two-page layout.
+
+Read: https://chitalka.github.io/demo/
+Release: https://github.com/chitalka/reader/releases/tag/v2.01

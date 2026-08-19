@@ -127,3 +127,15 @@ The project uses TypeScript without a UI framework, [Vite](https://vite.dev/) fo
 ## Releases and license
 
 Release history is documented in [CHANGELOG.md](./CHANGELOG.md). Chitalka is maintained by [Oleg Mokhov](https://t.me/olegmokhov) and distributed under the [MIT License](./LICENSE).
+
+Each public release also includes illustrated Release Notes in [the Russian Telegram channel](https://t.me/chitalka_reader_ru) and [the English Telegram channel](https://t.me/chitalka_reader). Release images and captions are stored under `release-assets/<version>/`.
+
+Telegram publication uses `scripts/publish-telegram-release.mjs`. Copy `.env.release.example` to the ignored `.env.release.local`, add a newly issued bot token, and run a dry check before publishing:
+
+```bash
+node scripts/publish-telegram-release.mjs \
+  --channel @chitalka_reader_ru \
+  --caption release-assets/2.01/telegram-ru.txt \
+  --image release-assets/2.01/chitalka-2.01.png \
+  --dry-run
+```
