@@ -12,7 +12,7 @@ Chitalka is a fast, local-first browser reader for FB2 and EPUB books. Files sel
 - Extracts hierarchical tables of contents from FB2 sections, EPUB 3 navigation documents, and EPUB 2 NCX files, with heading-based EPUB fallback navigation.
 - Uses an adaptive one- or two-page layout with virtualized chapters for fast loading and resizing.
 - Supports page buttons, keyboard navigation, touch swipes, and accelerated page turns from repeated input.
-- Automatically hides the header while reading. Move the mouse to reveal it, or tap the reading area to toggle it on touch devices.
+- Keeps compact floating controls visible and interactive without shifting the book layout.
 - Offers adjustable font size, light and dark themes, one- or two-page modes, footnote modes, and configurable page buttons.
 - Saves books, settings, reading positions, bookmarks, and highlighted quotes locally in IndexedDB. Books are identified by the SHA-256 hash of their original bytes, so renaming a file does not lose its state.
 - Supports optional, local-first synchronization through the private application folders in Google Drive and Yandex Disk. Both providers can be connected at the same time.
@@ -30,10 +30,7 @@ The bundled edition of *Anna Karenina* opens automatically as the demo book. Use
 | `Home` / `End` | First / last page |
 | `+` / `-` | Increase / decrease font size |
 | Swipe left / right | Next / previous page |
-| Tap the reading area | Show or hide the header |
-| Move the mouse | Show the header and restart its inactivity timer |
-
-The header hides after a page turn or five seconds without interaction. Opening the settings panel keeps it visible. Page buttons can be shown, hidden, or left in **Auto** mode, which hides them on smaller touch-oriented layouts.
+The floating header remains available after page turns. Page buttons can be shown, hidden, or left in **Auto** mode, which hides them on smaller touch-oriented layouts.
 
 ## Format support and safety
 
@@ -126,3 +123,7 @@ books/
 ```
 
 The project uses TypeScript without a UI framework, [Vite](https://vite.dev/) for development and production builds, [fflate](https://github.com/101arrowz/fflate) for in-browser archive extraction, and [Vitest](https://vitest.dev/) with jsdom for tests.
+
+## Releases and license
+
+Release history is documented in [CHANGELOG.md](./CHANGELOG.md). Chitalka is maintained by [Oleg Mokhov](https://t.me/olegmokhov) and distributed under the [MIT License](./LICENSE).

@@ -134,6 +134,19 @@ describe('HeaderVisibilityController', () => {
     vi.advanceTimersByTime(1);
     expect(root.dataset.headerVisibility).toBe('hidden');
   });
+
+  it('keeps persistent floating controls visible and interactive after hide requests', () => {
+    controller.destroy();
+    controller = new HeaderVisibilityController(root, header, 5_000, undefined, 'persistent');
+
+    controller.reveal();
+    controller.hide();
+    vi.advanceTimersByTime(10_000);
+
+    expect(root.dataset.headerVisibility).toBe('visible');
+    expect(header.hasAttribute('aria-hidden')).toBe(false);
+    expect(header.hasAttribute('inert')).toBe(false);
+  });
 });
 
 describe('isShortTap', () => {

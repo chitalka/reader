@@ -11,6 +11,8 @@ const SWIPE_MIN_DISTANCE = 48;
 const SWIPE_DISTANCE_RATIO = 0.18;
 const SWIPE_MIN_VELOCITY = 0.35;
 
+export type HeaderVisibilityMode = 'auto' | 'persistent';
+
 export function isShortTap(start: TouchPoint | undefined, end: TouchPoint): boolean {
   if (!start || start.pointerId !== end.pointerId) return false;
   return Math.hypot(end.x - start.x, end.y - start.y) <= TAP_DISTANCE;
@@ -252,20 +254,25 @@ export class HeaderVisibilityController {
     private readonly header: HTMLElement,
     private readonly idleDelay = DEFAULT_IDLE_DELAY,
     private readonly onIdleHide?: () => void,
+    private readonly mode: HeaderVisibilityMode = 'auto',
   ) {}
 
   reveal(): void {
     this.setHidden(false);
-    this.scheduleHide();
+    if (this.mode === 'auto') this.scheduleHide();
   }
 
   hide(): void {
-    if (this.pinned) return;
+    if (this.pinned || this.mode === 'persistent') return;
     this.clearTimer();
     this.setHidden(true);
   }
 
   toggle(): void {
+    if (this.mode === 'persistent') {
+      this.reveal();
+      return;
+    }
     if (this.root.dataset.headerVisibility === 'hidden') {
       this.reveal();
     } else {
@@ -275,7 +282,7 @@ export class HeaderVisibilityController {
 
   setPinned(pinned: boolean): void {
     this.pinned = pinned;
-    if (pinned) {
+    if (pinned || this.mode === 'persistent') {
       this.clearTimer();
       this.setHidden(false);
     } else {
@@ -289,7 +296,7 @@ export class HeaderVisibilityController {
 
   private scheduleHide(): void {
     this.clearTimer();
-    if (this.pinned) return;
+    if (this.pinned || this.mode === 'persistent') return;
     this.hideTimer = window.setTimeout(() => {
       this.hideTimer = undefined;
       this.setHidden(true);

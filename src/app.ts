@@ -140,6 +140,7 @@ export class ChitalkaApp {
   private readonly nextButton = requiredElement<HTMLButtonElement>('next-page');
   private readonly progressGroup = requiredElement<HTMLElement>('progress-group');
   private readonly progress = requiredElement<HTMLProgressElement>('book-progress');
+  private readonly progressPercent = requiredElement<HTMLElement>('progress-percent');
   private readonly pageLabel = requiredElement<HTMLElement>('page-label');
   private readonly timeLabel = requiredElement<HTMLElement>('time-label');
   private readonly paginationPlaceholder = requiredElement<HTMLElement>('pagination-placeholder');
@@ -173,8 +174,8 @@ export class ChitalkaApp {
   private readonly annotationEditorDelete = requiredElement<HTMLButtonElement>('annotation-editor-delete');
   private readonly annotationEditorCancel = requiredElement<HTMLButtonElement>('annotation-editor-cancel');
   private readonly quoteMenuElement = requiredElement<HTMLFormElement>('quote-menu');
+  private readonly quoteMenuTitle = requiredElement<HTMLElement>('quote-menu-title');
   private readonly quoteMenuClose = requiredElement<HTMLButtonElement>('quote-menu-close');
-  private readonly quoteMenuPreview = requiredElement<HTMLElement>('quote-menu-preview');
   private readonly quoteMenuColors = requiredElement<HTMLElement>('quote-menu-colors');
   private readonly quoteMenuNote = requiredElement<HTMLTextAreaElement>('quote-menu-note');
   private readonly quoteMenuSave = requiredElement<HTMLButtonElement>('quote-menu-save');
@@ -200,6 +201,7 @@ export class ChitalkaApp {
     this.header,
     undefined,
     () => this.showHeaderHint(),
+    'persistent',
   );
   private readonly settingsPanelController: SettingsPanelController;
   private readonly tocPanelController: TocPanelController;
@@ -262,8 +264,8 @@ export class ChitalkaApp {
       {
         form: this.quoteMenuElement,
         selectionRoot: this.content,
+        title: this.quoteMenuTitle,
         closeButton: this.quoteMenuClose,
-        preview: this.quoteMenuPreview,
         colors: this.quoteMenuColors,
         note: this.quoteMenuNote,
         saveButton: this.quoteMenuSave,
@@ -560,7 +562,9 @@ export class ChitalkaApp {
         })
         : t('reader.page', { current: snapshot.currentPage, total: snapshot.totalPages });
       this.progress.value = snapshot.progress;
-      this.progress.textContent = `${Math.round(snapshot.progress)}%`;
+      const roundedProgress = Math.round(snapshot.progress);
+      this.progressPercent.textContent = `${roundedProgress}%`;
+      this.progress.textContent = `${roundedProgress}%`;
       this.updateTimeEstimate(snapshot.progress);
       this.setPaginationPending(false);
     } else {
@@ -638,7 +642,7 @@ export class ChitalkaApp {
     document.documentElement.dataset.themeMode = this.settings.theme;
     document.documentElement.dataset.theme = theme;
     const themeColor = document.querySelector<HTMLMetaElement>('#app-theme-color');
-    if (themeColor) themeColor.content = theme === 'dark' ? '#191816' : '#f3efe7';
+    if (themeColor) themeColor.content = theme === 'dark' ? '#171717' : '#f5f4f2';
   }
 
   private updateSettingsControls(): void {

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta id="app-theme-color" name="theme-color" content="#f3efe7" />
+    <meta id="app-theme-color" name="theme-color" content="#f5f4f2" />
     <meta
       name="description"
       content="Chitalka — a local browser reader for FB2 and EPUB books"
@@ -38,17 +38,17 @@
         document.documentElement.dataset.themeMode = theme;
         document.documentElement.dataset.theme = effectiveTheme;
         document.querySelector('#app-theme-color').content = effectiveTheme === 'dark'
-          ? '#191816'
-          : '#f3efe7';
+          ? '#171717'
+          : '#f5f4f2';
       })();
     </script>
     <style>
       html {
-        background: #f3efe7;
+        background: #f5f4f2;
       }
 
       html[data-theme="dark"] {
-        background: #191816;
+        background: #171717;
       }
 
       .app-splash {
@@ -59,19 +59,15 @@
         place-items: center;
         overflow: hidden;
         padding: 24px;
-        color: #262626;
-        background:
-          radial-gradient(circle at 50% 42%, rgba(237, 233, 254, 0.86), transparent 18rem),
-          #f3efe7;
+        color: #29272c;
+        background: #f5f4f2;
         opacity: 1;
         transition: opacity 160ms cubic-bezier(0.23, 1, 0.32, 1);
       }
 
       html[data-theme="dark"] .app-splash {
-        color: #e5e5e5;
-        background:
-          radial-gradient(circle at 50% 42%, rgba(46, 16, 101, 0.72), transparent 18rem),
-          #191816;
+        color: #f0edf3;
+        background: #171717;
       }
 
       .app-splash[data-motion-state="closing"],
@@ -215,14 +211,6 @@
               <circle cx="12" cy="12" r="3" />
             </svg>
           </button>
-          <label class="language-select" data-language-switcher title="Interface language" data-i18n-title="language.label">
-            <span id="language-select-label" class="visually-hidden" data-i18n="language.label">Interface language</span>
-            <select id="language-select" aria-labelledby="language-select-label">
-              <option value="en">En</option>
-              <option value="ru">Ru</option>
-            </select>
-            <svg viewBox="0 0 12 8" aria-hidden="true"><path d="m1 1.5 5 5 5-5" /></svg>
-          </label>
           <input
             id="book-file"
             class="visually-hidden"
@@ -250,7 +238,7 @@
         <div class="toc-panel-header">
           <h2 id="toc-title" data-i18n="toc.title">Table of contents</h2>
           <button id="toc-close" class="panel-close" type="button" aria-label="Close table of contents" data-i18n-aria-label="toc.close" title="Close table of contents" data-i18n-title="toc.close">
-            <span aria-hidden="true">×</span>
+            <svg class="close-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
           </button>
         </div>
         <nav id="toc-list-root" class="toc-navigation" aria-label="Book sections" data-i18n-aria-label="toc.sections"></nav>
@@ -267,7 +255,7 @@
         <div class="annotations-panel-header">
           <h2 id="annotations-title" data-i18n="annotations.title">Bookmarks and quotes</h2>
           <button id="annotations-close" class="panel-close" type="button" aria-label="Close bookmarks and quotes" data-i18n-aria-label="annotations.close" title="Close bookmarks and quotes" data-i18n-title="annotations.close">
-            <span aria-hidden="true">×</span>
+            <svg class="close-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
           </button>
         </div>
         <div class="annotation-tabs" role="tablist" aria-label="Saved places" data-i18n-aria-label="annotations.savedPlaces">
@@ -313,16 +301,16 @@
         <div class="settings-panel-header">
           <h2 id="settings-title" data-i18n="settings.title">Reading settings</h2>
           <button id="settings-close" class="settings-close" type="button" aria-label="Close settings" data-i18n-aria-label="settings.close" title="Close settings" data-i18n-title="settings.close">
-            <span aria-hidden="true">×</span>
+            <svg class="close-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
           </button>
         </div>
 
         <fieldset class="settings-group">
           <legend data-i18n="settings.fontSize">Font size</legend>
           <div class="font-size-control">
-            <button id="font-down" class="setting-step" type="button" aria-label="Decrease font size" data-i18n-aria-label="settings.fontDecrease" title="Decrease font size" data-i18n-title="settings.fontDecrease">A−</button>
+            <button id="font-down" class="setting-step" type="button" aria-label="Decrease font size" data-i18n-aria-label="settings.fontDecrease" title="Decrease font size" data-i18n-title="settings.fontDecrease">−</button>
             <output id="font-size-value" aria-live="polite">18 px</output>
-            <button id="font-up" class="setting-step" type="button" aria-label="Increase font size" data-i18n-aria-label="settings.fontIncrease" title="Increase font size" data-i18n-title="settings.fontIncrease">A+</button>
+            <button id="font-up" class="setting-step" type="button" aria-label="Increase font size" data-i18n-aria-label="settings.fontIncrease" title="Increase font size" data-i18n-title="settings.fontIncrease">+</button>
           </div>
         </fieldset>
 
@@ -342,6 +330,18 @@
               <span data-i18n="settings.themeDark">Dark</span>
             </label>
           </div>
+        </fieldset>
+
+        <fieldset class="settings-group settings-language-group">
+          <legend data-i18n="language.label">Interface language</legend>
+          <label class="language-select" data-language-switcher title="Interface language" data-i18n-title="language.label">
+            <span id="language-select-label" class="visually-hidden" data-i18n="language.label">Interface language</span>
+            <select id="language-select" aria-labelledby="language-select-label">
+              <option value="en">En</option>
+              <option value="ru">Ru</option>
+            </select>
+            <svg viewBox="0 0 12 8" aria-hidden="true"><path d="m1 1.5 5 5 5-5" /></svg>
+          </label>
         </fieldset>
 
         <fieldset class="settings-group">
@@ -421,6 +421,18 @@
             <button id="sync-now" type="button" disabled data-i18n="sync.now" title="Synchronize now" data-i18n-title="sync.now">Synchronize now</button>
           </div>
         </fieldset>
+
+        <div class="settings-project-info">
+          <p>
+            © <time datetime="2026">2026</time>,
+            <a href="https://t.me/olegmokhov" target="_blank" rel="noopener noreferrer">Олег Мохов / Oleg Mokhov</a>
+          </p>
+          <p>
+            <a href="https://github.com/chitalka/reader/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
+            <span aria-hidden="true">·</span>
+            <span>v.2.01</span>
+          </p>
+        </div>
       </section>
 
       <main id="drop-zone" class="reader-shell" aria-busy="true">
@@ -440,15 +452,16 @@
           <footer class="reader-footer">
             <div class="paging-controls" aria-label="Book navigation" data-i18n-aria-label="reader.navigation">
               <button id="previous-page" class="page-button" type="button" aria-label="Previous page" data-i18n-aria-label="reader.previousPage" title="Previous page" data-i18n-title="reader.previousPage">
-                <span aria-hidden="true">←</span>
+                <svg class="page-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4.5-5.5 5.5 5.5 5.5" /></svg>
               </button>
               <button id="next-page" class="page-button" type="button" aria-label="Next page" data-i18n-aria-label="reader.nextPage" title="Next page" data-i18n-title="reader.nextPage">
-                <span aria-hidden="true">→</span>
+                <svg class="page-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m7.5 4.5 5.5 5.5-5.5 5.5" /></svg>
               </button>
             </div>
 
             <div id="progress-group" class="progress-group" aria-busy="true">
               <div class="progress-copy">
+                <span id="progress-percent">0%</span>
                 <span id="page-label">Page 1 of 1</span>
                 <span id="time-label">Less than a minute left</span>
               </div>
@@ -478,9 +491,13 @@
 
       <div id="toast" class="toast" role="alert" hidden></div>
 
-      <form id="quote-menu" class="quote-menu" role="dialog" aria-label="Save quote" data-i18n-aria-label="annotations.saveQuote" hidden>
-        <button id="quote-menu-close" class="quote-menu-close" type="button" aria-label="Close" data-i18n-aria-label="annotations.closeQuote">×</button>
-        <p id="quote-menu-preview" class="quote-menu-preview"></p>
+      <form id="quote-menu" class="quote-menu" role="dialog" aria-labelledby="quote-menu-title" hidden>
+        <div class="quote-menu-header">
+          <h2 id="quote-menu-title" data-i18n="annotations.saveQuote">Save quote</h2>
+          <button id="quote-menu-close" class="quote-menu-close" type="button" aria-label="Close" data-i18n-aria-label="annotations.closeQuote">
+            <svg class="close-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
+          </button>
+        </div>
         <div id="quote-menu-colors" class="annotation-colors" role="radiogroup" aria-label="Quote color" data-i18n-aria-label="annotations.quoteColor"></div>
         <label>
           <span data-i18n="annotations.note">Note</span>

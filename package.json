@@ -1,9 +1,20 @@
 {
   "name": "chitalka",
-  "version": "1.0.0",
+  "version": "2.1.0",
+  "displayVersion": "2.01",
   "private": true,
   "type": "module",
   "description": "A modern, browser-based FB2 and EPUB reader",
+  "author": {
+    "name": "Oleg Mokhov",
+    "url": "https://t.me/olegmokhov"
+  },
+  "license": "MIT",
+  "homepage": "https://chitalka.github.io/demo/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chitalka/reader.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

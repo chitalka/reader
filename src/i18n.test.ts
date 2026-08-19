@@ -35,7 +35,7 @@ describe('interface localization', () => {
     expect(document.querySelector('button')?.textContent).toBe('Открыть книгу');
     expect(document.querySelector('button')?.getAttribute('aria-label')).toBe('Открыть книгу');
     expect(document.querySelector('button')?.getAttribute('title')).toBe('Открыть книгу');
-    expect(document.querySelector('textarea')?.placeholder).toBe('Необязательно');
+    expect(document.querySelector('textarea')?.placeholder).toBe('Добавьте пометку, если хотите');
     expect(document.querySelector<HTMLLinkElement>('link[rel="manifest"]')?.href)
       .toContain('manifest.ru.webmanifest');
     expect(document.documentElement.hasAttribute('aria-pressed')).toBe(false);

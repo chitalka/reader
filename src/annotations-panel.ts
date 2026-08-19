@@ -392,8 +392,8 @@ export class AnnotationPanelController {
 export interface QuoteMenuElements {
   form: HTMLFormElement;
   selectionRoot: HTMLElement;
+  title: HTMLElement;
   closeButton: HTMLButtonElement;
-  preview: HTMLElement;
   colors: HTMLElement;
   note: HTMLTextAreaElement;
   saveButton: HTMLButtonElement;
@@ -444,6 +444,9 @@ export class QuoteMenuController {
   refreshLanguage(): void {
     this.colors.refreshLanguage();
     if (this.opened) {
+      this.elements.title.textContent = t(
+        this.existing ? 'annotations.editQuote' : 'annotations.saveQuote',
+      );
       this.elements.saveButton.textContent = t(
         this.existing ? 'annotations.saveChanges' : 'annotations.saveQuote',
       );
@@ -454,7 +457,9 @@ export class QuoteMenuController {
     this.isOpen = true;
     this.selection = selection;
     this.existing = existing;
-    this.elements.preview.textContent = selection.exact.replace(/\s+/gu, ' ').trim();
+    this.elements.title.textContent = t(
+      existing ? 'annotations.editQuote' : 'annotations.saveQuote',
+    );
     this.elements.note.value = existing?.note ?? '';
     this.colors.set(existing?.color ?? 'purple');
     this.elements.saveButton.textContent = t(
@@ -485,17 +490,17 @@ export class QuoteMenuController {
     const width = Math.min(360, window.innerWidth - 24);
     const left = Math.max(12, Math.min(window.innerWidth - width - 12, rect.left));
     const desiredTop = rect.bottom + 10;
-    const estimatedHeight = 300;
-    const top = desiredTop + estimatedHeight < window.innerHeight
+    const menuHeight = this.elements.form.getBoundingClientRect().height || 260;
+    const top = desiredTop + menuHeight < window.innerHeight
       ? desiredTop
-      : Math.max(12, rect.top - estimatedHeight - 10);
+      : Math.max(12, rect.top - menuHeight - 10);
     this.elements.form.style.left = `${left}px`;
     this.elements.form.style.top = `${top}px`;
     const originX = Math.min(width - 20, Math.max(20, rect.left + rect.width / 2 - left));
     this.elements.form.style.setProperty('--motion-origin-x', `${originX}px`);
     this.elements.form.style.setProperty(
       '--motion-origin-y',
-      desiredTop + estimatedHeight < window.innerHeight ? '0px' : '100%',
+      desiredTop + menuHeight < window.innerHeight ? '0px' : '100%',
     );
   }
 

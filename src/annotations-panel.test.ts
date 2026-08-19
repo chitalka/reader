@@ -97,8 +97,9 @@ describe('QuoteMenuController', () => {
     document.body.innerHTML = `
       <article id="selection-root"><p data-reader-anchor="1">Это цитата внутри текста</p></article>
       <form id="menu" hidden>
+        <h2 id="title"></h2>
         <button id="close" type="button"></button>
-        <p id="preview"></p><div id="colors"></div>
+        <div id="colors"></div>
         <textarea id="note"></textarea>
         <button id="save" type="submit"></button>
         <button id="delete" type="button"></button>
@@ -131,8 +132,8 @@ describe('QuoteMenuController', () => {
     const controller = new QuoteMenuController({
       form: byId<HTMLFormElement>('menu'),
       selectionRoot,
+      title: byId('title'),
       closeButton: byId<HTMLButtonElement>('close'),
-      preview: byId('preview'),
       colors: byId('colors'),
       note: byId<HTMLTextAreaElement>('note'),
       saveButton: byId<HTMLButtonElement>('save'),

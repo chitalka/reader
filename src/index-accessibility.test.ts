@@ -24,7 +24,7 @@ describe('reader shell accessibility', () => {
     expect(languageSelect?.getAttribute('aria-labelledby')).toBe('language-select-label');
     expect(Array.from(languageSelect?.options ?? []).map((option) => option.value))
       .toEqual(['en', 'ru']);
-    expect(markup.querySelector('.language-select')?.nextElementSibling?.id).toBe('book-file');
+    expect(markup.querySelector('.language-select')?.closest('#settings-panel')).not.toBeNull();
     expect(markup.querySelector('.open-button .upload-icon')).not.toBeNull();
     expect(markup.querySelector('.open-button-label')).toBeNull();
     expect(markup.querySelector('.open-button-icon')).toBeNull();
@@ -47,6 +47,21 @@ describe('reader shell accessibility', () => {
   it('offers light, automatic, and dark themes in that order', () => {
     const themes = Array.from(markup.querySelectorAll<HTMLInputElement>('input[name="theme"]'));
     expect(themes.map((input) => input.value)).toEqual(['light', 'auto', 'dark']);
+  });
+
+  it('publishes the author, license, year, and public release version in settings', () => {
+    const projectInfo = markup.querySelector<HTMLElement>('.settings-project-info');
+    const author = projectInfo?.querySelector<HTMLAnchorElement>('a[href="https://t.me/olegmokhov"]');
+    const license = projectInfo?.querySelector<HTMLAnchorElement>(
+      'a[href="https://github.com/chitalka/reader/blob/master/LICENSE"]',
+    );
+
+    expect(projectInfo?.closest('#settings-panel')).not.toBeNull();
+    expect(projectInfo?.querySelector('time')?.textContent).toBe('2026');
+    expect(author?.textContent).toBe('Олег Мохов / Oleg Mokhov');
+    expect(author?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(license?.textContent).toBe('MIT License');
+    expect(projectInfo?.textContent).toContain('v.2.01');
   });
 
   it('covers the unfinished reader with an accessible initial splash', () => {
