@@ -2646,9 +2646,7 @@ textarea {
   display: flex;
   padding-top: 12px;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px 14px;
-  flex-wrap: wrap;
+  justify-content: flex-start;
   border-top: var(--ui-border-width) solid var(--ui-border);
   color: var(--muted);
   font-family: var(--ui-font-family);
@@ -2662,7 +2660,8 @@ textarea {
   margin: 0;
   align-items: baseline;
   gap: 5px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .settings-project-info a {

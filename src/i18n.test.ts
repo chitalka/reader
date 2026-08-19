@@ -25,6 +25,7 @@ describe('interface localization', () => {
         data-i18n-title="header.openBook"
       >Open book</button>
       <textarea data-i18n-placeholder="annotations.optional"></textarea>
+      <span data-i18n="settings.author">Oleg Mokhov</span>
     `;
 
     setLanguage('ru');
@@ -36,6 +37,7 @@ describe('interface localization', () => {
     expect(document.querySelector('button')?.getAttribute('aria-label')).toBe('Открыть книгу');
     expect(document.querySelector('button')?.getAttribute('title')).toBe('Открыть книгу');
     expect(document.querySelector('textarea')?.placeholder).toBe('Добавьте пометку, если хотите');
+    expect(document.querySelector('span')?.textContent).toBe('Олег Мохов');
     expect(document.querySelector<HTMLLinkElement>('link[rel="manifest"]')?.href)
       .toContain('manifest.ru.webmanifest');
     expect(document.documentElement.hasAttribute('aria-pressed')).toBe(false);

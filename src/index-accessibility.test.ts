@@ -58,10 +58,11 @@ describe('reader shell accessibility', () => {
 
     expect(projectInfo?.closest('#settings-panel')).not.toBeNull();
     expect(projectInfo?.querySelector('time')?.textContent).toBe('2026');
-    expect(author?.textContent).toBe('Олег Мохов / Oleg Mokhov');
+    expect(author?.textContent).toBe('Oleg Mokhov');
     expect(author?.getAttribute('rel')).toBe('noopener noreferrer');
     expect(license?.textContent).toBe('MIT License');
-    expect(projectInfo?.textContent).toContain('v.2.01');
+    expect(projectInfo?.textContent?.replace(/\s+/gu, ' ').trim())
+      .toBe('© 2026 · Oleg Mokhov · MIT License · v.2.01');
   });
 
   it('covers the unfinished reader with an accessible initial splash', () => {
