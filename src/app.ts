@@ -22,7 +22,6 @@ import {
 import { formatPageLabel } from './reader/page-label';
 import { SkimController } from './skim-controller';
 import { JsonStorage, positionStorage } from './reader/storage';
-import { OnboardingHints } from './onboarding';
 import { SettingsPanelController } from './settings-panel';
 import { TocPanelController } from './toc-panel';
 import { AnnotationPanelController, QuoteMenuController } from './annotations-panel';
@@ -103,7 +102,6 @@ function tocTargets(items: BookTocItem[]): string[] {
 }
 
 export class ChitalkaApp {
-  private readonly onboarding = new OnboardingHints();
   private readonly settingsStorage = new JsonStorage<ReaderSettings>(
     'chitalka:settings:v1',
     DEFAULT_SETTINGS,
@@ -264,8 +262,8 @@ export class ChitalkaApp {
     this.appRoot,
     this.header,
     undefined,
-    () => this.showHeaderHint(),
-    'auto',
+    undefined,
+    'manual',
     [this.pagingControls, this.progressGroup],
   );
   private readonly settingsPanelController: SettingsPanelController;
@@ -1525,11 +1523,6 @@ export class ChitalkaApp {
     this.toastTimer = window.setTimeout(() => {
       this.toastMotion.hide();
     }, 5000);
-  }
-
-  private showHeaderHint(): void {
-    if (this.isPreparing || !this.onboarding.claimHeaderHint()) return;
-    this.showToast(t('toast.headerHint'));
   }
 
   private readonly handleColorSchemeChange = (): void => {

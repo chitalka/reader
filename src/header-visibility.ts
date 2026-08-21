@@ -11,7 +11,7 @@ const SWIPE_MIN_DISTANCE = 48;
 const SWIPE_DISTANCE_RATIO = 0.18;
 const SWIPE_MIN_VELOCITY = 0.35;
 
-export type HeaderVisibilityMode = 'auto' | 'persistent';
+export type HeaderVisibilityMode = 'auto' | 'manual' | 'persistent';
 
 export function isShortTap(start: TouchPoint | undefined, end: TouchPoint): boolean {
   if (!start || start.pointerId !== end.pointerId) return false;

@@ -165,6 +165,24 @@ describe('HeaderVisibilityController', () => {
     expect(root.dataset.headerVisibility).toBe('hidden');
   });
 
+  it('keeps manual reading controls visible until the user toggles them', () => {
+    controller.destroy();
+    controller = new HeaderVisibilityController(root, header, 5_000, undefined, 'manual');
+
+    controller.reveal();
+    vi.advanceTimersByTime(30_000);
+    expect(root.dataset.headerVisibility).toBe('visible');
+
+    controller.toggle();
+    expect(root.dataset.headerVisibility).toBe('hidden');
+
+    vi.advanceTimersByTime(30_000);
+    expect(root.dataset.headerVisibility).toBe('hidden');
+
+    controller.toggle();
+    expect(root.dataset.headerVisibility).toBe('visible');
+  });
+
   it('does not hide from a toggle while settings pin the header', () => {
     controller.setPinned(true);
     controller.toggle();
