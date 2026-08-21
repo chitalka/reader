@@ -312,7 +312,9 @@ export class HeaderVisibilityController {
   }
 
   private setHidden(hidden: boolean): void {
-    this.root.dataset.headerVisibility = hidden ? 'hidden' : 'visible';
+    const nextState = hidden ? 'hidden' : 'visible';
+    if (this.root.dataset.headerVisibility === nextState) return;
+    this.root.dataset.headerVisibility = nextState;
     for (const element of [this.header, ...this.companionControls]) {
       if (hidden) {
         element.setAttribute('aria-hidden', 'true');

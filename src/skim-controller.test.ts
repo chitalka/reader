@@ -127,6 +127,21 @@ describe('SkimController', () => {
     expect(commitSkim).not.toHaveBeenCalled();
   });
 
+  it('does not rewrite static pagination attributes on an ordinary page turn', async () => {
+    const mutations: MutationRecord[] = [];
+    const observer = new MutationObserver((records) => mutations.push(...records));
+    observer.observe(elements.input, { attributes: true });
+
+    controller.sync(snapshot(13));
+    await Promise.resolve();
+
+    const changedAttributes = mutations.map((record) => record.attributeName);
+    expect(changedAttributes).not.toContain('max');
+    expect(changedAttributes).not.toContain('disabled');
+    expect(changedAttributes).not.toContain('aria-valuemax');
+    observer.disconnect();
+  });
+
   it('shows a hover preview and removes it without committing', () => {
     const move = new Event('pointermove', { bubbles: true });
     Object.assign(move, { clientX: 80, pointerType: 'mouse', pointerId: 1 });

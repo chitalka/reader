@@ -114,7 +114,14 @@ export class ReaderPager {
     private readonly motionCompanion?: HTMLElement,
   ) {
     if (typeof ResizeObserver !== 'undefined') {
-      this.resizeObserver = new ResizeObserver(() => this.scheduleLayout());
+      this.resizeObserver = new ResizeObserver(() => {
+        if (
+          this.layout
+          && this.layout.viewportWidth === Math.max(1, this.viewport.clientWidth)
+          && this.layout.viewportHeight === Math.max(1, this.viewport.clientHeight)
+        ) return;
+        this.scheduleLayout();
+      });
       this.resizeObserver.observe(this.viewport);
     } else {
       window.addEventListener('resize', this.handleWindowResize);
@@ -165,14 +172,17 @@ export class ReaderPager {
       this.moveToCurrent(false);
     }
 
-    const images = this.chunks.flatMap((chunk) => Array.from(chunk.element.querySelectorAll('img')));
-    for (const image of images) {
-      if (image.complete) continue;
-      const relayoutIfMounted = (): void => {
-        if (generation === this.bookGeneration && image.isConnected) this.scheduleLayout();
-      };
-      image.addEventListener('load', relayoutIfMounted, { once: true });
-      image.addEventListener('error', relayoutIfMounted, { once: true });
+    for (const [chunkIndex, chunk] of this.chunks.entries()) {
+      for (const image of Array.from(chunk.element.querySelectorAll('img'))) {
+        if (image.complete) continue;
+        const relayoutIfMounted = (): void => {
+          if (generation !== this.bookGeneration || !image.isConnected) return;
+          this.invalidateChunkPageCount(chunkIndex);
+          this.scheduleLayout();
+        };
+        image.addEventListener('load', relayoutIfMounted, { once: true });
+        image.addEventListener('error', relayoutIfMounted, { once: true });
+      }
     }
 
     void document.fonts?.ready?.then(() => {
@@ -690,8 +700,13 @@ export class ReaderPager {
     }
 
     const mountedChunk = this.chunks[this.currentChunkIndex];
-    this.pageCount = this.pagesForElement(this.content, mountedChunk.element, geometry);
-    this.recordPageCount(this.currentChunkIndex, this.pageCount);
+    const cachedPageCount = this.chunkPageCounts.get(this.currentChunkIndex);
+    if (cachedPageCount === undefined) {
+      this.pageCount = this.pagesForElement(this.content, mountedChunk.element, geometry);
+      this.recordPageCount(this.currentChunkIndex, this.pageCount);
+    } else {
+      this.pageCount = cachedPageCount;
+    }
 
     const restoreAnchorChunk = restore.anchor && this.anchorChunks.get(restore.anchor);
     const restoreElement = restore.anchor && this.anchorElements.get(restore.anchor);
@@ -1069,6 +1084,11 @@ export class ReaderPager {
       const sample = Math.max(16, words / count);
       this.estimatedWordsPerPage = this.estimatedWordsPerPage * 0.7 + sample * 0.3;
     }
+  }
+
+  private invalidateChunkPageCount(chunkIndex: number): void {
+    this.chunkPageCounts.delete(chunkIndex);
+    if (this.layout) this.layoutPageCountCache.get(this.layout.key)?.delete(chunkIndex);
   }
 
   private pageCountForSnapshot(chunkIndex: number): number {

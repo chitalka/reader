@@ -2,6 +2,13 @@
 
 All notable public changes to Chitalka are documented in this file.
 
+## [2.02.01] - 2026-08-21
+
+### Fixed
+
+- Fixed EPUB page numbers remaining frozen while the book continued to turn in macOS and iOS Safari.
+- Fixed page counts being recalculated during ordinary page turns and header/footer visibility changes. Measured EPUB sections now reuse cached pagination until the book geometry changes.
+
 ## [2.02] - 2026-08-21
 
 ### Added
@@ -57,5 +64,6 @@ All notable public changes to Chitalka are documented in this file.
 - Included optional synchronization through private application folders in Google Drive and Yandex Disk.
 - Published the installable PWA demo at <https://chitalka.github.io/demo/>.
 
+[2.02.01]: https://github.com/chitalka/reader/releases/tag/v2.02.01
 [2.02]: https://github.com/chitalka/reader/releases/tag/v2.02
 [2.01]: https://github.com/chitalka/reader/releases/tag/v2.01

@@ -62,9 +62,13 @@ export class SkimController {
 
   sync(snapshot: PagerSnapshot): void {
     this.committedPage = snapshot.currentPage;
-    this.elements.input.max = String(snapshot.totalPages);
-    this.elements.input.disabled = !snapshot.paginationExact || snapshot.totalPages <= 1;
-    this.elements.input.setAttribute('aria-valuemax', String(snapshot.totalPages));
+    const maximum = String(snapshot.totalPages);
+    if (this.elements.input.max !== maximum) this.elements.input.max = maximum;
+    const disabled = !snapshot.paginationExact || snapshot.totalPages <= 1;
+    if (this.elements.input.disabled !== disabled) this.elements.input.disabled = disabled;
+    if (this.elements.input.getAttribute('aria-valuemax') !== maximum) {
+      this.elements.input.setAttribute('aria-valuemax', maximum);
+    }
     this.elements.group.style.setProperty(
       '--skim-committed-position',
       this.progressForPage(snapshot.currentPage),

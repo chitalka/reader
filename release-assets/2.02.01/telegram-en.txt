@@ -1,0 +1,9 @@
+Chitalka 2.02.01
+
+Two bugs fixed:
+
+• EPUB page numbers could remain frozen in Safari while the book continued to turn. They now move with the content on macOS and iOS.
+• Ordinary page turns and hiding or showing the reading controls could restart page-count calculation. Completed pagination is now reused and recalculated only when the book geometry changes.
+
+Demo: https://chitalka.github.io/demo/
+Full notes: https://github.com/chitalka/reader/releases/tag/v2.02.01

@@ -471,6 +471,71 @@ describe('ReaderPager', () => {
     expect(pager.getSnapshot()).toMatchObject({ chunkIndex: 0, anchor: 'first' });
   });
 
+  it('reuses an exact cached page count when entering an already measured chunk', async () => {
+    vi.useFakeTimers();
+    const scrollWidth = vi.fn(() => 434);
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, get: scrollWidth });
+    const first = chunk(anchor('first', 0, 80));
+    const second = chunk(anchor('second', 0, 80));
+
+    await pager.setBook(chunkedBook(first, second));
+    await vi.advanceTimersByTimeAsync(40);
+    expect(pager.getSnapshot().paginationExact).toBe(true);
+    scrollWidth.mockClear();
+
+    pager.next();
+
+    expect(pager.getSnapshot()).toMatchObject({ chunkIndex: 1, anchor: 'second' });
+    expect(scrollWidth).not.toHaveBeenCalled();
+  });
+
+  it('remeasures the mounted chunk after an image finishes loading', async () => {
+    const scrollWidth = vi.fn(() => 434);
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, get: scrollWidth });
+    const image = document.createElement('img');
+    Object.defineProperty(image, 'complete', { configurable: true, value: false });
+    const current = chunk(anchor('first', 0, 80), image);
+
+    await pager.setBook(chunkedBook(current));
+    scrollWidth.mockClear();
+    image.dispatchEvent(new Event('load'));
+
+    expect(scrollWidth).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores ResizeObserver notifications when viewport geometry did not change', async () => {
+    pager.destroy();
+    let resize: ResizeObserverCallback = () => undefined;
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: ResizeObserverCallback) {
+        resize = callback;
+      }
+
+      observe = observe;
+      disconnect = disconnect;
+    });
+    const scrollWidth = vi.fn(() => 434);
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, get: scrollWidth });
+    pager = new ReaderPager(
+      viewport,
+      content,
+      (snapshot) => snapshots.push(snapshot),
+      motionCompanion,
+    );
+    await pager.setBook(chunkedBook(chunk(anchor('first', 0, 80))));
+    scrollWidth.mockClear();
+
+    resize([], {} as ResizeObserver);
+    expect(scrollWidth).not.toHaveBeenCalled();
+
+    Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 900 });
+    resize([], {} as ResizeObserver);
+    expect(scrollWidth).toHaveBeenCalledTimes(1);
+    expect(observe).toHaveBeenCalledWith(viewport);
+  });
+
   it('finishes exact pagination when Safari never runs requestIdleCallback', async () => {
     vi.useFakeTimers();
     const cancelIdleCallback = vi.fn();

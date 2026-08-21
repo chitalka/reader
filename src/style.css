@@ -3823,9 +3823,16 @@ progress::-moz-progress-bar {
   display: block;
 }
 
-.reader-footer.is-pending .fullscreen-reader-status {
+#app[data-header-visibility="hidden"]
+  .reader-footer.is-pending .fullscreen-reader-status {
   visibility: hidden;
   opacity: 0;
+}
+
+#app[data-header-visibility="hidden"][data-fullscreen-status="page"]
+  .reader-footer.is-pending .fullscreen-reader-status {
+  visibility: visible;
+  opacity: 1;
 }
 
 @media (max-width: 520px) {

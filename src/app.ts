@@ -19,6 +19,7 @@ import {
   type PageMode,
   type PageTurnMotion,
 } from './reader/pager';
+import { formatPageLabel } from './reader/page-label';
 import { SkimController } from './skim-controller';
 import { JsonStorage, positionStorage } from './reader/storage';
 import { OnboardingHints } from './onboarding';
@@ -676,25 +677,23 @@ export class ChitalkaApp {
 
   private renderProgress(snapshot: PagerSnapshot, motion?: PageTurnMotion): void {
     this.skimController.sync(snapshot);
+    this.pageLabel.textContent = formatPageLabel(snapshot);
+    this.renderFullscreenPages(snapshot, motion);
+    const pagesPerView = String(snapshot.pagesPerView);
+    if (this.appRoot.dataset.pagesPerView !== pagesPerView) {
+      this.appRoot.dataset.pagesPerView = pagesPerView;
+    }
     if (snapshot.paginationExact) {
-      const lastPage = Math.min(
-        snapshot.totalPages,
-        snapshot.currentPage + snapshot.pagesPerView - 1,
-      );
-      this.pageLabel.textContent = lastPage > snapshot.currentPage
-        ? t('reader.pages', {
-          first: snapshot.currentPage,
-          last: lastPage,
-          total: snapshot.totalPages,
-        })
-        : t('reader.page', { current: snapshot.currentPage, total: snapshot.totalPages });
-      this.progress.value = snapshot.progress;
+      if (this.progress.value !== snapshot.progress) this.progress.value = snapshot.progress;
       const roundedProgress = Math.round(snapshot.progress);
-      this.progressPercent.textContent = `${roundedProgress}%`;
-      this.fullscreenProgressPercent.textContent = `${roundedProgress}%`;
-      this.renderFullscreenPages(snapshot, motion);
-      this.appRoot.dataset.pagesPerView = String(snapshot.pagesPerView);
-      this.progress.textContent = `${roundedProgress}%`;
+      const progressText = `${roundedProgress}%`;
+      if (this.progressPercent.textContent !== progressText) {
+        this.progressPercent.textContent = progressText;
+      }
+      if (this.fullscreenProgressPercent.textContent !== progressText) {
+        this.fullscreenProgressPercent.textContent = progressText;
+      }
+      if (this.progress.textContent !== progressText) this.progress.textContent = progressText;
       this.updateTimeEstimate(snapshot.progress);
       this.setPaginationPending(false);
     } else {
@@ -757,26 +756,34 @@ export class ChitalkaApp {
   }
 
   private setPaginationPending(pending: boolean): void {
+    const value = String(pending);
+    if (
+      this.progressGroup.classList.contains('is-pending') === pending
+      && this.readerFooter.classList.contains('is-pending') === pending
+      && this.progressGroup.getAttribute('aria-busy') === value
+      && this.paginationPlaceholder.hidden === !pending
+    ) return;
     this.progressGroup.classList.toggle('is-pending', pending);
     this.readerFooter.classList.toggle('is-pending', pending);
-    this.progressGroup.setAttribute('aria-busy', String(pending));
+    this.progressGroup.setAttribute('aria-busy', value);
     this.paginationPlaceholder.hidden = !pending;
   }
 
   private updateTimeEstimate(progress: number): void {
     const wordsLeft = Math.max(0, this.currentWordCount * (1 - progress / 100));
     const minutes = estimateMinutes(wordsLeft, this.personalSpeed, this.settings.wordsPerMinute);
-
-    if (minutes <= 1) {
-      this.timeLabel.textContent = t('reader.lessThanMinute');
-    } else if (minutes < 60) {
-      this.timeLabel.textContent = t('reader.minutesLeft', { minutes });
-    } else {
+    const timeText = (() => {
+      if (minutes <= 1) return t('reader.lessThanMinute');
+      if (minutes < 60) return t('reader.minutesLeft', { minutes });
       const hours = Math.floor(minutes / 60);
       const remainder = minutes % 60;
-      this.timeLabel.textContent = t('reader.hoursLeft', { hours, minutes: remainder });
+      return t('reader.hoursLeft', { hours, minutes: remainder });
+    })();
+    if (this.timeLabel.textContent !== timeText) this.timeLabel.textContent = timeText;
+    const compactTimeText = formatCompactTimeLeft(minutes);
+    if (this.compactTimeLabel.textContent !== compactTimeText) {
+      this.compactTimeLabel.textContent = compactTimeText;
     }
-    this.compactTimeLabel.textContent = formatCompactTimeLeft(minutes);
   }
 
   private showSettingsSection(section: string): void {

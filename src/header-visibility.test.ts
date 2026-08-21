@@ -123,6 +123,33 @@ describe('HeaderVisibilityController', () => {
     expect(root.dataset.headerVisibility).toBe('hidden');
   });
 
+  it('does not rewrite chrome attributes when it is already hidden', async () => {
+    const footerControls = document.createElement('div');
+    controller.destroy();
+    controller = new HeaderVisibilityController(
+      root,
+      header,
+      5_000,
+      undefined,
+      'auto',
+      [footerControls],
+    );
+    controller.reveal();
+    controller.hide();
+
+    const mutations: MutationRecord[] = [];
+    const observer = new MutationObserver((records) => mutations.push(...records));
+    for (const element of [root, header, footerControls]) {
+      observer.observe(element, { attributes: true });
+    }
+
+    controller.hide();
+    await Promise.resolve();
+
+    expect(mutations).toEqual([]);
+    observer.disconnect();
+  });
+
   it('toggles the header on consecutive reading-area taps', () => {
     controller.reveal();
 
