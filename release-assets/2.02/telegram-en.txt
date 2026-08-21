@@ -1,0 +1,13 @@
+Chitalka 2.02
+
+A major release for calmer reading and a clearer view of your reading rhythm.
+
+• Preview pages and spreads directly from the progress bar with a pointer, drag gesture, or keyboard.
+• Optional personal analytics: active time, session history, activity calendar, speed in words and characters, and a completion forecast.
+• Analytics syncs through private Google Drive and Yandex Disk app folders; book files are never uploaded.
+• A new dedicated settings screen.
+• Full-screen status can show the page, percentage, or nothing; page numbers now move with the book.
+• Fixed exact EPUB page counting in Safari and illustrations splitting across pages.
+
+Demo: https://chitalka.github.io/demo/
+Full notes: https://github.com/chitalka/reader/releases/tag/v2.02

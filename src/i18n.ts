@@ -66,8 +66,40 @@ const english = {
   'settings.footnotesAppendix': 'At the end',
   'settings.footnotesInline': 'In the text',
   'settings.pageArrows': 'Page-turn arrows',
+  'settings.fullscreenMode': 'Full-screen mode',
+  'settings.fullscreenPage': 'Page',
+  'settings.fullscreenProgress': 'Percentage',
+  'settings.fullscreenNone': 'Nothing',
   'settings.show': 'Show',
   'settings.hide': 'Hide',
+  'settings.allTitle': 'Settings',
+  'settings.returnReading': 'Return to reading',
+  'settings.sections': 'Settings sections',
+  'settings.reading': 'General',
+  'settings.analytics': 'Analytics',
+  'settings.about': 'About',
+  'analytics.title': 'Personal analytics',
+  'analytics.description': 'Reading data stays on this device and is synchronized through connected private app folders.',
+  'analytics.toggle': 'Keep personal reading analytics',
+  'analytics.emptyTitle': 'Your reading statistics will appear here',
+  'analytics.emptyCopy': 'Only active reading counts. Loading, background time, pauses and rapid page skimming are excluded from reading speed.',
+  'analytics.speed': 'Reading speed',
+  'analytics.forecast': 'Forecast for the open book',
+  'analytics.week': 'Reading time this week',
+  'analytics.calendar': 'Activity calendar',
+  'analytics.sessions': 'Recent sessions',
+  'analytics.showAll': 'Show all history',
+  'analytics.showRecent': 'Show recent sessions',
+  'analytics.clear': 'Delete analytics data…',
+  'analytics.clearTitle': 'Delete analytics data?',
+  'analytics.clearCopy': 'Reading history and the calendar will be deleted from this device. Bookmarks, quotes and book progress will be preserved.',
+  'analytics.cancel': 'Cancel',
+  'analytics.delete': 'Delete',
+  'analytics.storageError': 'Reading continues, but this session could not be saved. Free some browser storage and try again.',
+  'sync.positions': 'Reading positions',
+  'sync.settings': 'Settings',
+  'sync.annotations': 'Bookmarks and quotes',
+  'sync.analytics': 'Personal analytics',
   'sync.title': 'Synchronization',
   'sync.helpData': 'Reading position, settings, bookmarks, and quotes.',
   'sync.helpAutomatic': 'Automatically after changes and periodically.',
@@ -100,7 +132,15 @@ const english = {
   'reader.lessThanMinute': 'Less than a minute left',
   'reader.minutesLeft': 'About {minutes} min left',
   'reader.hoursLeft': 'About {hours} hr {minutes} min left',
+  'reader.compactMinutesLeft': '{minutes} min left',
+  'reader.compactHoursLeft': '{hours} hr left',
+  'reader.compactHoursMinutesLeft': '{hours} hr {minutes} min left',
   'reader.countingPages': 'Counting pages',
+  'reader.skim': 'Preview another page',
+  'reader.skimPage': 'Page {current} · {progress}%',
+  'reader.skimPages': 'Pages {first}–{last} · {progress}%',
+  'reader.skimPointerHint': 'Release to go · Esc to cancel',
+  'reader.skimKeyboardHint': '← → preview · Enter to go · Esc to cancel',
   'reader.dropBook': 'Drop the book here',
   'reader.supportedFormats': 'FB2, FB2.ZIP, and EPUB are supported',
   'reader.footnotes': 'Footnotes',
@@ -241,8 +281,40 @@ const russian: Record<TranslationKey, string> = {
   'settings.footnotesAppendix': 'В конце',
   'settings.footnotesInline': 'В тексте',
   'settings.pageArrows': 'Стрелки перелистывания',
+  'settings.fullscreenMode': 'Полноэкранный режим',
+  'settings.fullscreenPage': 'Страница',
+  'settings.fullscreenProgress': 'Проценты',
+  'settings.fullscreenNone': 'Ничего',
   'settings.show': 'Показывать',
   'settings.hide': 'Скрывать',
+  'settings.allTitle': 'Настройки',
+  'settings.returnReading': 'Вернуться к чтению',
+  'settings.sections': 'Разделы настроек',
+  'settings.reading': 'Общее',
+  'settings.analytics': 'Аналитика',
+  'settings.about': 'О приложении',
+  'analytics.title': 'Персональная аналитика',
+  'analytics.description': 'Данные остаются на этом устройстве и синхронизируются через подключённые приватные папки приложения.',
+  'analytics.toggle': 'Вести персональную аналитику чтения',
+  'analytics.emptyTitle': 'Здесь появится статистика чтения',
+  'analytics.emptyCopy': 'Учитывается только активное чтение. Загрузка, фоновый режим, паузы и быстрое пролистывание не влияют на скорость.',
+  'analytics.speed': 'Скорость чтения',
+  'analytics.forecast': 'Прогноз для открытой книги',
+  'analytics.week': 'Время чтения за неделю',
+  'analytics.calendar': 'Календарь активности',
+  'analytics.sessions': 'Последние сессии',
+  'analytics.showAll': 'Показать всю историю',
+  'analytics.showRecent': 'Показать последние сессии',
+  'analytics.clear': 'Удалить данные аналитики…',
+  'analytics.clearTitle': 'Удалить данные аналитики?',
+  'analytics.clearCopy': 'История чтения и календарь будут удалены с этого устройства. Закладки, цитаты и прогресс книг сохранятся.',
+  'analytics.cancel': 'Отмена',
+  'analytics.delete': 'Удалить',
+  'analytics.storageError': 'Чтение продолжится, но эту сессию не удалось сохранить. Освободите место в хранилище браузера и попробуйте снова.',
+  'sync.positions': 'Позиции чтения',
+  'sync.settings': 'Настройки',
+  'sync.annotations': 'Закладки и цитаты',
+  'sync.analytics': 'Персональная аналитика',
   'sync.title': 'Синхронизация',
   'sync.helpData': 'Позиция чтения, настройки, закладки и цитаты.',
   'sync.helpAutomatic': 'Автоматически после изменений и периодически.',
@@ -275,7 +347,15 @@ const russian: Record<TranslationKey, string> = {
   'reader.lessThanMinute': 'До конца меньше минуты',
   'reader.minutesLeft': 'До конца около {minutes} мин',
   'reader.hoursLeft': 'До конца около {hours} ч {minutes} мин',
+  'reader.compactMinutesLeft': 'До конца {minutes} {minuteUnit}',
+  'reader.compactHoursLeft': 'До конца {hours} {hourUnit}',
+  'reader.compactHoursMinutesLeft': 'До конца {hours} {hourUnit} {minutes} {minuteUnit}',
   'reader.countingPages': 'Считаем страницы',
+  'reader.skim': 'Предпросмотреть другую страницу',
+  'reader.skimPage': 'Стр. {current} · {progress}%',
+  'reader.skimPages': 'Стр. {first}–{last} · {progress}%',
+  'reader.skimPointerHint': 'Отпустите, чтобы перейти · Esc — отменить',
+  'reader.skimKeyboardHint': '← → предпросмотр · Enter — перейти · Esc — отменить',
   'reader.dropBook': 'Отпустите книгу здесь',
   'reader.supportedFormats': 'Поддерживаются FB2, FB2.ZIP и EPUB',
   'reader.footnotes': 'Сноски',
@@ -380,6 +460,43 @@ export function t(key: TranslationKey, parameters: Parameters = {}): string {
   return dictionaries[currentLanguage][key].replace(/\{(\w+)\}/gu, (match, name: string) => (
     parameters[name] === undefined ? match : String(parameters[name])
   ));
+}
+
+function russianUnit(value: number, one: string, few: string, many: string): string {
+  const lastTwo = value % 100;
+  if (lastTwo >= 11 && lastTwo <= 14) return many;
+  const last = value % 10;
+  if (last === 1) return one;
+  return last >= 2 && last <= 4 ? few : many;
+}
+
+export function formatCompactTimeLeft(totalMinutes: number): string {
+  const value = Math.max(0, Math.round(totalMinutes));
+  if (value <= 1) return t('reader.lessThanMinute');
+  if (value < 60) {
+    return t('reader.compactMinutesLeft', {
+      minutes: value,
+      minuteUnit: currentLanguage === 'ru'
+        ? russianUnit(value, 'минута', 'минуты', 'минут')
+        : 'min',
+    });
+  }
+
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  const parameters = {
+    hours,
+    minutes,
+    hourUnit: currentLanguage === 'ru'
+      ? russianUnit(hours, 'час', 'часа', 'часов')
+      : 'hr',
+    minuteUnit: currentLanguage === 'ru'
+      ? russianUnit(minutes, 'минута', 'минуты', 'минут')
+      : 'min',
+  };
+  return minutes === 0
+    ? t('reader.compactHoursLeft', parameters)
+    : t('reader.compactHoursMinutesLeft', parameters);
 }
 
 export function applyDocumentTranslations(root: ParentNode = document): void {

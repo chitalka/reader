@@ -1,5 +1,5 @@
 import { decodeBookFile, decodeBookUrl, type DecodedBookSource } from './fb2/decode';
-import type { BookTocItem } from './book/model';
+import { tocPathLabels, type BookTocItem } from './book/model';
 import { hasDraggedFiles, preventBookContentDrag } from './book/drag';
 import { parseFb2 } from './fb2/parse';
 import { renderFb2 } from './fb2/render';
@@ -13,7 +13,13 @@ import {
   swipeTurnDirection,
 } from './header-visibility';
 import { VisibilityMotion } from './motion';
-import { ReaderPager, type PagerSnapshot, type PageMode } from './reader/pager';
+import {
+  ReaderPager,
+  type PagerSnapshot,
+  type PageMode,
+  type PageTurnMotion,
+} from './reader/pager';
+import { SkimController } from './skim-controller';
 import { JsonStorage, positionStorage } from './reader/storage';
 import { OnboardingHints } from './onboarding';
 import { SettingsPanelController } from './settings-panel';
@@ -29,6 +35,7 @@ import {
 } from './reader/quotes';
 import {
   bookmarkId,
+  nextRevision,
   visibleBookmarks,
   visibleQuotes,
   type AnnotationColor,
@@ -39,10 +46,20 @@ import {
 import { GoogleDriveProvider } from './sync/google';
 import { YandexDiskProvider } from './sync/yandex';
 import { SyncEngine } from './sync/engine';
+import { AnalyticsRepository } from './reader/analytics-repository';
+import {
+  estimateMinutes,
+  medianReadingSpeed,
+  nonWhitespaceCharacters,
+  ReadingSessionTracker,
+  type ReadingSession,
+  type ReadingSpeed,
+} from './reader/analytics';
 import type { CloudProvider, ProviderStatusEvent } from './sync/provider';
 import { hideLoadingOverlay, showLoadingOverlay } from './splash';
 import {
   applyDocumentTranslations,
+  formatCompactTimeLeft,
   getLanguage,
   normalizeLanguage,
   setLanguage as activateLanguage,
@@ -53,9 +70,11 @@ import {
 import {
   DEFAULT_SETTINGS,
   effectiveTheme,
+  normalizeFullscreenStatusMode,
   normalizePageButtonsMode,
   normalizeTheme,
   type FootnoteMode,
+  type FullscreenStatusMode,
   type PageButtonsMode,
   type ReaderSettings,
   type Theme,
@@ -90,6 +109,7 @@ export class ChitalkaApp {
   );
   private settings = this.normalizedSettings(this.settingsStorage.read());
   private readonly library = new ReaderLibrary();
+  private readonly analyticsRepository = new AnalyticsRepository();
   private readonly googleSyncConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
   private readonly yandexSyncConfigured = Boolean(import.meta.env.VITE_YANDEX_CLIENT_ID);
   private readonly colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -98,13 +118,26 @@ export class ChitalkaApp {
   private readonly syncEngine = new SyncEngine(
     this.library.repository,
     [this.googleProvider, this.yandexProvider],
+    this.analyticsRepository,
   );
+  private readonly analyticsTracker = new ReadingSessionTracker(async (session) => {
+    try {
+      await this.analyticsRepository.add(session);
+    } catch {
+      this.showToast(t('analytics.storageError'));
+      return;
+    }
+    this.syncEngine.schedule();
+    if (this.settingsPanelController?.opened) await this.renderAnalytics();
+  });
   private readonly viewport = requiredElement<HTMLElement>('book-viewport');
   private readonly content = requiredElement<HTMLElement>('book-content');
+  private readonly fullscreenPageTrack = requiredElement<HTMLElement>('fullscreen-page-track');
   private readonly pager = new ReaderPager(
     this.viewport,
     this.content,
-    (snapshot) => this.onPageChanged(snapshot),
+    (snapshot, motion) => this.onPageChanged(snapshot, motion),
+    this.fullscreenPageTrack,
   );
   private currentBookFilename?: string;
   private currentBookTitle?: string;
@@ -112,7 +145,11 @@ export class ChitalkaApp {
   private currentBookmarks: BookmarkRecord[] = [];
   private currentQuotes: QuoteRecord[] = [];
   private currentWordCount = 0;
+  private currentCharacterCount = 0;
+  private personalSpeed?: ReadingSpeed;
+  private analyticsHistoryExpanded = false;
   private currentTocTargets: string[] = [];
+  private currentTocLabels = new Map<string, string>();
   private backAnchor?: string;
   private isPreparing = true;
   private dragDepth = 0;
@@ -138,11 +175,23 @@ export class ChitalkaApp {
   private readonly author = requiredElement<HTMLElement>('book-author');
   private readonly previousButton = requiredElement<HTMLButtonElement>('previous-page');
   private readonly nextButton = requiredElement<HTMLButtonElement>('next-page');
+  private readonly pagingControls = requiredElement<HTMLElement>('paging-controls');
   private readonly progressGroup = requiredElement<HTMLElement>('progress-group');
   private readonly progress = requiredElement<HTMLProgressElement>('book-progress');
   private readonly progressPercent = requiredElement<HTMLElement>('progress-percent');
   private readonly pageLabel = requiredElement<HTMLElement>('page-label');
   private readonly timeLabel = requiredElement<HTMLElement>('time-label');
+  private readonly compactTimeLabel = requiredElement<HTMLElement>('time-label-compact');
+  private readonly readerFooter = requiredElement<HTMLElement>('reader-footer');
+  private readonly fullscreenProgressPercent = requiredElement<HTMLElement>(
+    'fullscreen-progress-percent',
+  );
+  private readonly scrubber = requiredElement<HTMLInputElement>('book-scrubber');
+  private readonly skimPopover = requiredElement<HTMLElement>('skim-popover');
+  private readonly skimChapter = requiredElement<HTMLElement>('skim-chapter');
+  private readonly skimPage = requiredElement<HTMLElement>('skim-page');
+  private readonly skimPreview = requiredElement<HTMLElement>('skim-preview');
+  private readonly skimHint = requiredElement<HTMLElement>('skim-hint');
   private readonly paginationPlaceholder = requiredElement<HTMLElement>('pagination-placeholder');
   private readonly fontDownButton = requiredElement<HTMLButtonElement>('font-down');
   private readonly fontUpButton = requiredElement<HTMLButtonElement>('font-up');
@@ -186,10 +235,24 @@ export class ChitalkaApp {
   private readonly yandexSyncStatus = requiredElement<HTMLElement>('yandex-sync-status');
   private readonly syncLastTime = requiredElement<HTMLElement>('sync-last-time');
   private readonly syncNowButton = requiredElement<HTMLButtonElement>('sync-now');
+  private readonly analyticsToggle = requiredElement<HTMLInputElement>('reading-analytics-toggle');
+  private readonly analyticsEmpty = requiredElement<HTMLElement>('analytics-empty');
+  private readonly analyticsDashboard = requiredElement<HTMLElement>('analytics-dashboard');
+  private readonly analyticsSummary = requiredElement<HTMLElement>('analytics-summary');
+  private readonly analyticsSpeed = requiredElement<HTMLElement>('analytics-speed');
+  private readonly analyticsForecast = requiredElement<HTMLElement>('analytics-forecast');
+  private readonly analyticsWeek = requiredElement<HTMLElement>('analytics-week');
+  private readonly analyticsCalendar = requiredElement<HTMLElement>('analytics-calendar');
+  private readonly analyticsSessions = requiredElement<HTMLElement>('analytics-sessions');
+  private readonly analyticsHistoryToggle = requiredElement<HTMLButtonElement>('analytics-history-toggle');
+  private readonly analyticsClear = requiredElement<HTMLButtonElement>('analytics-clear');
+  private readonly analyticsClearDialog = requiredElement<HTMLDialogElement>('analytics-clear-dialog');
+  private readonly analyticsClearConfirm = requiredElement<HTMLButtonElement>('analytics-clear-confirm');
   private readonly languageSelect = requiredElement<HTMLSelectElement>('language-select');
   private readonly themeInputs = requiredInputs('theme');
   private readonly pageModeInputs = requiredInputs('page-mode');
   private readonly pageButtonInputs = requiredInputs('page-buttons');
+  private readonly fullscreenStatusInputs = requiredInputs('fullscreen-status');
   private readonly footnoteModeInputs = requiredInputs('footnote-mode');
   private readonly backButton = requiredElement<HTMLButtonElement>('back-to-text');
   private readonly toast = requiredElement<HTMLElement>('toast');
@@ -201,12 +264,14 @@ export class ChitalkaApp {
     this.header,
     undefined,
     () => this.showHeaderHint(),
-    'persistent',
+    'auto',
+    [this.pagingControls, this.progressGroup],
   );
   private readonly settingsPanelController: SettingsPanelController;
   private readonly tocPanelController: TocPanelController;
   private readonly annotationPanelController: AnnotationPanelController;
   private readonly quoteMenuController: QuoteMenuController;
+  private readonly skimController: SkimController;
 
   constructor() {
     activateLanguage(this.settings.language);
@@ -274,6 +339,25 @@ export class ChitalkaApp {
       (selection, note, color) => this.saveQuote(selection, note, color),
       (quote) => this.deleteAnnotation(quote),
     );
+    this.skimController = new SkimController(
+      {
+        group: this.progressGroup,
+        input: this.scrubber,
+        popover: this.skimPopover,
+        chapter: this.skimChapter,
+        page: this.skimPage,
+        preview: this.skimPreview,
+        hint: this.skimHint,
+      },
+      this.pager,
+      {
+        chapterForAnchor: (anchor) => this.skimChapterForAnchor(anchor),
+        committed: () => {
+          this.clearFootnoteReturn();
+          this.headerVisibility.hide();
+        },
+      },
+    );
   }
 
   async start(): Promise<void> {
@@ -301,6 +385,7 @@ export class ChitalkaApp {
         : DEFAULT_SETTINGS.fontSize,
       pageMode: pageModes.includes(value.pageMode) ? value.pageMode : DEFAULT_SETTINGS.pageMode,
       pageButtons: normalizePageButtonsMode(value.pageButtons),
+      fullscreenStatus: normalizeFullscreenStatusMode(value.fullscreenStatus),
       footnoteMode: footnoteModes.includes(value.footnoteMode)
         ? value.footnoteMode
         : DEFAULT_SETTINGS.footnoteMode,
@@ -308,6 +393,7 @@ export class ChitalkaApp {
       wordsPerMinute: Number.isFinite(value.wordsPerMinute)
         ? Math.min(500, Math.max(80, value.wordsPerMinute))
         : DEFAULT_SETTINGS.wordsPerMinute,
+      readingAnalytics: value.readingAnalytics === true,
     };
   }
 
@@ -319,7 +405,9 @@ export class ChitalkaApp {
       ?.setAttribute('data-footnotes', this.settings.footnoteMode);
     this.applyTheme();
     document.documentElement.dataset.pageButtons = this.settings.pageButtons;
+    this.appRoot.dataset.fullscreenStatus = this.settings.fullscreenStatus;
     this.updateSettingsControls();
+    this.analyticsTracker.configure(this.settings.readingAnalytics);
   }
 
   private bindEvents(): void {
@@ -342,6 +430,11 @@ export class ChitalkaApp {
         if (input.checked) this.setPageButtons(input.value as PageButtonsMode);
       });
     }
+    for (const input of this.fullscreenStatusInputs) {
+      input.addEventListener('change', () => {
+        if (input.checked) this.setFullscreenStatus(input.value as FullscreenStatusMode);
+      });
+    }
     for (const input of this.footnoteModeInputs) {
       input.addEventListener('change', () => {
         if (input.checked) this.setFootnoteMode(input.value as FootnoteMode);
@@ -352,6 +445,24 @@ export class ChitalkaApp {
       this.setInterfaceLanguage(normalizeLanguage(this.languageSelect.value));
     });
     this.colorSchemeQuery.addEventListener('change', this.handleColorSchemeChange);
+    this.analyticsToggle.addEventListener('change', () => {
+      this.settings.readingAnalytics = this.analyticsToggle.checked;
+      this.saveSettings('readingAnalytics');
+      this.analyticsTracker.configure(this.settings.readingAnalytics);
+      void this.renderAnalytics();
+    });
+    for (const button of this.settingsPanel.querySelectorAll<HTMLButtonElement>('[data-settings-section]')) {
+      button.addEventListener('click', () => this.showSettingsSection(button.dataset.settingsSection ?? 'reading'));
+    }
+    this.analyticsClear.addEventListener('click', () => this.analyticsClearDialog.showModal());
+    this.analyticsHistoryToggle.addEventListener('click', () => {
+      this.analyticsHistoryExpanded = !this.analyticsHistoryExpanded;
+      void this.renderAnalytics();
+    });
+    this.analyticsClearConfirm.addEventListener('click', () => void this.clearAnalytics());
+    document.addEventListener('visibilitychange', () => this.analyticsTracker.setPaused(document.hidden));
+    window.addEventListener('blur', () => this.analyticsTracker.setPaused(true));
+    window.addEventListener('focus', () => this.analyticsTracker.setPaused(false));
 
     this.fileInput.addEventListener('change', () => {
       const file = this.fileInput.files?.[0];
@@ -363,6 +474,7 @@ export class ChitalkaApp {
     preventBookContentDrag(this.content);
     this.content.addEventListener('pointerdown', () => {
       this.selectionPointerActive = true;
+      this.analyticsTracker.record(this.pager.getSnapshot());
     });
     document.addEventListener('pointerup', () => {
       if (!this.selectionPointerActive) return;
@@ -444,7 +556,9 @@ export class ChitalkaApp {
     this.currentBookTitle = rendered.metadata.title;
     this.currentBookFingerprint = source.fingerprint;
     this.currentWordCount = rendered.wordCount;
+    this.currentCharacterCount = nonWhitespaceCharacters(rendered.fragment.textContent ?? '');
     this.currentTocTargets = tocTargets(rendered.toc);
+    this.currentTocLabels = tocPathLabels(rendered.toc);
     this.tocPanelController.setItems(rendered.toc);
     this.backAnchor = undefined;
     this.backButton.hidden = true;
@@ -459,6 +573,15 @@ export class ChitalkaApp {
       format: source.format,
       filename: source.filename,
     });
+    const state = await this.library.repository.read();
+    this.analyticsTracker.setBook({
+      fingerprint: source.fingerprint,
+      title: rendered.metadata.title,
+      deviceId: state.deviceId,
+      wordCount: this.currentWordCount,
+      characterCount: this.currentCharacterCount,
+    });
+    await this.refreshPersonalSpeed();
     await this.refreshAnnotations();
 
     const savedPosition = await this.library.position(source.fingerprint, source.filename);
@@ -481,11 +604,13 @@ export class ChitalkaApp {
     this.currentBookFilename = undefined;
     this.currentBookTitle = undefined;
     this.currentBookFingerprint = undefined;
+    this.analyticsTracker.setBook(undefined);
     this.currentBookmarks = [];
     this.currentQuotes = [];
     this.annotationPanelController.setRecords([], [], false);
     this.quoteMenuController.close();
     this.currentTocTargets = [];
+    this.currentTocLabels.clear();
     this.setPaginationPending(true);
     if (this.savePositionTimer) {
       window.clearTimeout(this.savePositionTimer);
@@ -520,14 +645,15 @@ export class ChitalkaApp {
     this.headerVisibility.reveal();
   }
 
-  private onPageChanged(snapshot: PagerSnapshot): void {
+  private onPageChanged(snapshot: PagerSnapshot, motion?: PageTurnMotion): void {
     this.previousButton.disabled = this.pager.isFirst();
     this.nextButton.disabled = this.pager.isLast();
     this.tocPanelController.setActive(
       this.pager.closestPrecedingAnchor(this.currentTocTargets, snapshot.anchor),
     );
 
-    this.renderProgress(snapshot);
+    this.renderProgress(snapshot, motion);
+    this.analyticsTracker.record(snapshot);
 
     if (this.currentBookFingerprint && !this.isPreparing) {
       if (this.savePositionTimer) window.clearTimeout(this.savePositionTimer);
@@ -548,7 +674,8 @@ export class ChitalkaApp {
     this.updateCurrentBookmark(snapshot.anchor);
   }
 
-  private renderProgress(snapshot: PagerSnapshot): void {
+  private renderProgress(snapshot: PagerSnapshot, motion?: PageTurnMotion): void {
+    this.skimController.sync(snapshot);
     if (snapshot.paginationExact) {
       const lastPage = Math.min(
         snapshot.totalPages,
@@ -564,6 +691,9 @@ export class ChitalkaApp {
       this.progress.value = snapshot.progress;
       const roundedProgress = Math.round(snapshot.progress);
       this.progressPercent.textContent = `${roundedProgress}%`;
+      this.fullscreenProgressPercent.textContent = `${roundedProgress}%`;
+      this.renderFullscreenPages(snapshot, motion);
+      this.appRoot.dataset.pagesPerView = String(snapshot.pagesPerView);
       this.progress.textContent = `${roundedProgress}%`;
       this.updateTimeEstimate(snapshot.progress);
       this.setPaginationPending(false);
@@ -572,15 +702,70 @@ export class ChitalkaApp {
     }
   }
 
+  private renderFullscreenPages(snapshot: PagerSnapshot, motion?: PageTurnMotion): void {
+    const cssDistance = Number.parseFloat(
+      this.fullscreenPageTrack.style.getPropertyValue('--reader-page-turn-distance'),
+    );
+    const spreadDistance = motion?.spreadDistance
+      ?? (Number.isFinite(cssDistance) && cssDistance > 0 ? cssDistance : this.viewport.clientWidth);
+    const offsets = new Map<number, number>([
+      [-1, -spreadDistance],
+      [0, 0],
+      [1, spreadDistance],
+    ]);
+
+    if (motion) {
+      const direction = Math.sign(motion.startOffset);
+      const crossedSpreads = Math.ceil(Math.abs(motion.startOffset) / spreadDistance);
+      for (let step = 2; step <= Math.min(6, crossedSpreads); step += 1) {
+        const pageOffset = -direction * step;
+        offsets.set(pageOffset, pageOffset * spreadDistance);
+      }
+      if (crossedSpreads > 6) {
+        const pageOffset = -Math.round(motion.startOffset / spreadDistance);
+        offsets.set(pageOffset, -motion.startOffset);
+      }
+    }
+
+    const fragment = document.createDocumentFragment();
+    for (const [spreadOffset, pixelOffset] of [...offsets].sort((a, b) => a[1] - b[1])) {
+      const firstPage = snapshot.currentPage + spreadOffset * snapshot.pagesPerView;
+      if (firstPage < 1 || firstPage > snapshot.totalPages) continue;
+      const spread = document.createElement('div');
+      spread.className = 'fullscreen-page-spread';
+      spread.dataset.pagesPerView = String(snapshot.pagesPerView);
+      spread.style.transform = `translateX(${pixelOffset}px)`;
+
+      const first = document.createElement('span');
+      first.textContent = String(firstPage);
+      spread.append(first);
+
+      const secondPage = firstPage + 1;
+      if (snapshot.pagesPerView === 2 && secondPage <= snapshot.totalPages) {
+        const second = document.createElement('span');
+        second.textContent = String(secondPage);
+        spread.append(second);
+      }
+      fragment.append(spread);
+    }
+    this.fullscreenPageTrack.replaceChildren(fragment);
+  }
+
+  private skimChapterForAnchor(anchor: string | undefined): string {
+    const target = this.pager.closestPrecedingAnchor(this.currentTocTargets, anchor);
+    return (target && this.currentTocLabels.get(target)) || this.currentBookTitle || t('app.name');
+  }
+
   private setPaginationPending(pending: boolean): void {
     this.progressGroup.classList.toggle('is-pending', pending);
+    this.readerFooter.classList.toggle('is-pending', pending);
     this.progressGroup.setAttribute('aria-busy', String(pending));
     this.paginationPlaceholder.hidden = !pending;
   }
 
   private updateTimeEstimate(progress: number): void {
     const wordsLeft = Math.max(0, this.currentWordCount * (1 - progress / 100));
-    const minutes = Math.ceil(wordsLeft / this.settings.wordsPerMinute);
+    const minutes = estimateMinutes(wordsLeft, this.personalSpeed, this.settings.wordsPerMinute);
 
     if (minutes <= 1) {
       this.timeLabel.textContent = t('reader.lessThanMinute');
@@ -591,6 +776,212 @@ export class ChitalkaApp {
       const remainder = minutes % 60;
       this.timeLabel.textContent = t('reader.hoursLeft', { hours, minutes: remainder });
     }
+    this.compactTimeLabel.textContent = formatCompactTimeLeft(minutes);
+  }
+
+  private showSettingsSection(section: string): void {
+    for (const view of this.settingsPanel.querySelectorAll<HTMLElement>('[data-settings-view]')) {
+      view.hidden = view.dataset.settingsView !== section;
+    }
+    for (const button of this.settingsPanel.querySelectorAll<HTMLButtonElement>('[data-settings-section]')) {
+      const active = button.dataset.settingsSection === section;
+      if (active) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
+    }
+    this.settingsPanel.scrollTop = 0;
+    if (section === 'analytics') void this.renderAnalytics();
+  }
+
+  private async refreshPersonalSpeed(sessions?: ReadingSession[]): Promise<void> {
+    const recent = sessions ?? await this.analyticsRepository.list();
+    this.personalSpeed = this.settings.readingAnalytics ? medianReadingSpeed(recent.slice(0, 10)) : undefined;
+    if (!this.isPreparing) this.updateTimeEstimate(this.pager.getSnapshot().progress);
+  }
+
+  private async renderAnalytics(): Promise<void> {
+    const sessions = await this.analyticsRepository.list();
+    await this.refreshPersonalSpeed(sessions);
+    const enabled = this.settings.readingAnalytics;
+    this.analyticsToggle.checked = enabled;
+    this.analyticsEmpty.hidden = enabled && sessions.length > 0;
+    this.analyticsDashboard.hidden = !enabled || sessions.length === 0;
+    this.analyticsClear.disabled = sessions.length === 0;
+    if (!enabled || !sessions.length) return;
+
+    const now = new Date();
+    const dayKey = (date: Date): string => date.toISOString().slice(0, 10);
+    const today = dayKey(now);
+    const todayMs = sessions.filter((session) => session.startedAt.slice(0, 10) === today)
+      .reduce((sum, session) => sum + session.activeMs, 0);
+    const totalScreens = sessions.reduce((sum, session) => sum + session.screensRead, 0);
+    const activeDays = new Set(sessions.map((session) => session.startedAt.slice(0, 10)));
+    let streak = 0;
+    for (let offset = 0; offset < 3660; offset += 1) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - offset);
+      if (!activeDays.has(dayKey(date))) break;
+      streak += 1;
+    }
+    this.analyticsSummary.replaceChildren(
+      this.analyticsMetric(this.settings.language === 'ru' ? 'Сегодня' : 'Today', this.formatDuration(todayMs)),
+      this.analyticsMetric(this.settings.language === 'ru' ? 'Серия' : 'Streak', this.settings.language === 'ru' ? `${streak} дн.` : `${streak} days`),
+      this.analyticsMetric(this.settings.language === 'ru' ? 'Перелистано' : 'Turned', this.settings.language === 'ru' ? `${totalScreens} экранов` : `${totalScreens} screens`),
+    );
+
+    this.analyticsSpeed.replaceChildren();
+    if (this.personalSpeed) {
+      const primary = document.createElement('strong');
+      primary.textContent = `${this.personalSpeed.wordsPerMinute} ${this.settings.language === 'ru' ? 'слов/мин' : 'words/min'}`;
+      const secondary = document.createElement('span');
+      secondary.textContent = `${this.personalSpeed.charactersPerMinute.toLocaleString(this.settings.language)} ${this.settings.language === 'ru' ? 'знаков/мин' : 'chars/min'}`;
+      this.analyticsSpeed.append(primary, secondary);
+    } else {
+      this.analyticsSpeed.textContent = this.settings.language === 'ru' ? 'Недостаточно данных' : 'Not enough data';
+    }
+
+    this.analyticsForecast.replaceChildren();
+    if (this.currentBookTitle && this.currentWordCount > 0) {
+      const progress = this.pager.getSnapshot().progress;
+      const minutes = estimateMinutes(this.currentWordCount * (1 - progress / 100), this.personalSpeed, this.settings.wordsPerMinute);
+      const title = document.createElement('strong');
+      title.textContent = this.currentBookTitle;
+      const remaining = document.createElement('span');
+      remaining.textContent = `${this.settings.language === 'ru' ? 'Осталось' : 'About'} ≈ ${this.formatDuration(minutes * 60_000)}`;
+      this.analyticsForecast.append(title, remaining);
+
+      const dailyReadingMinutes = this.medianDailyReadingMinutes(sessions, now);
+      if (dailyReadingMinutes) {
+        const rhythm = document.createElement('span');
+        const days = Math.max(1, Math.ceil(minutes / dailyReadingMinutes));
+        rhythm.textContent = this.settings.language === 'ru'
+          ? `При текущем ритме — ${days} дн.`
+          : `At your current pace — ${days} days`;
+        this.analyticsForecast.append(rhythm);
+      }
+    }
+
+    this.renderAnalyticsWeek(sessions, now);
+    this.renderAnalyticsCalendar(sessions, now);
+    this.renderAnalyticsSessions(this.analyticsHistoryExpanded ? sessions : sessions.slice(0, 3));
+    this.analyticsHistoryToggle.hidden = sessions.length <= 3;
+    this.analyticsHistoryToggle.textContent = t(this.analyticsHistoryExpanded ? 'analytics.showRecent' : 'analytics.showAll');
+    this.analyticsHistoryToggle.title = this.analyticsHistoryToggle.textContent;
+  }
+
+  private medianDailyReadingMinutes(sessions: ReadingSession[], now: Date): number | undefined {
+    const daily = new Map<string, number>();
+    const firstDay = new Date(now);
+    firstDay.setHours(0, 0, 0, 0);
+    firstDay.setDate(firstDay.getDate() - 13);
+    sessions.forEach((session) => {
+      const startedAt = new Date(session.startedAt);
+      if (startedAt < firstDay || startedAt > now) return;
+      const key = session.startedAt.slice(0, 10);
+      daily.set(key, (daily.get(key) ?? 0) + session.activeMs);
+    });
+    if (daily.size < 3) return undefined;
+    const values = [...daily.values()].map((value) => value / 60_000).sort((a, b) => a - b);
+    const middle = Math.floor(values.length / 2);
+    return values.length % 2 ? values[middle] : (values[middle - 1]! + values[middle]!) / 2;
+  }
+
+  private analyticsMetric(label: string, value: string): HTMLElement {
+    const item = document.createElement('div');
+    const caption = document.createElement('span');
+    const strong = document.createElement('strong');
+    caption.textContent = label;
+    strong.textContent = value;
+    item.append(caption, strong);
+    return item;
+  }
+
+  private renderAnalyticsWeek(sessions: ReadingSession[], now: Date): void {
+    const values: number[] = [];
+    for (let offset = 6; offset >= 0; offset -= 1) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - offset);
+      const key = date.toISOString().slice(0, 10);
+      values.push(sessions.filter((session) => session.startedAt.slice(0, 10) === key)
+        .reduce((sum, session) => sum + session.activeMs, 0));
+    }
+    const maximum = Math.max(...values, 1);
+    const formatter = new Intl.DateTimeFormat(this.settings.language, { weekday: 'short' });
+    this.analyticsWeek.replaceChildren(...values.map((value, index) => {
+      const item = document.createElement('div');
+      const bar = document.createElement('span');
+      bar.style.setProperty('--bar-height', `${Math.max(4, value / maximum * 100)}%`);
+      const date = new Date(now);
+      date.setDate(date.getDate() - (6 - index));
+      const label = document.createElement('small');
+      label.textContent = formatter.format(date);
+      item.title = this.formatDuration(value);
+      item.append(bar, label);
+      return item;
+    }));
+  }
+
+  private renderAnalyticsCalendar(sessions: ReadingSession[], now: Date): void {
+    const totals = new Map<string, number>();
+    sessions.forEach((session) => totals.set(
+      session.startedAt.slice(0, 10),
+      (totals.get(session.startedAt.slice(0, 10)) ?? 0) + session.activeMs,
+    ));
+    const cells: HTMLElement[] = [];
+    for (let offset = 364; offset >= 0; offset -= 1) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - offset);
+      const value = totals.get(date.toISOString().slice(0, 10)) ?? 0;
+      const cell = document.createElement('span');
+      cell.dataset.level = String(value === 0 ? 0 : value < 15 * 60_000 ? 1 : value < 30 * 60_000 ? 2 : value < 60 * 60_000 ? 3 : 4);
+      cell.title = `${new Intl.DateTimeFormat(this.settings.language, { dateStyle: 'medium' }).format(date)} · ${this.formatDuration(value)}`;
+      cells.push(cell);
+    }
+    this.analyticsCalendar.replaceChildren(...cells);
+  }
+
+  private renderAnalyticsSessions(sessions: ReadingSession[]): void {
+    const formatter = new Intl.DateTimeFormat(this.settings.language, { dateStyle: 'medium', timeStyle: 'short' });
+    this.analyticsSessions.replaceChildren(...sessions.map((session) => {
+      const row = document.createElement('div');
+      const heading = document.createElement('div');
+      const title = document.createElement('strong');
+      const duration = document.createElement('span');
+      const metadata = document.createElement('small');
+      title.textContent = session.bookTitle;
+      duration.textContent = this.formatDuration(session.activeMs);
+      const speed = session.speedSampleMs >= 120_000 ? Math.round(session.wordsRead / (session.speedSampleMs / 60_000)) : undefined;
+      metadata.textContent = [
+        formatter.format(new Date(session.startedAt)),
+        this.settings.language === 'ru' ? `${session.screensRead} экранов` : `${session.screensRead} screens`,
+        speed ? `${speed} ${this.settings.language === 'ru' ? 'слов/мин' : 'words/min'}` : undefined,
+      ].filter(Boolean).join(' · ');
+      heading.append(title, duration);
+      row.append(heading, metadata);
+      return row;
+    }));
+  }
+
+  private formatDuration(milliseconds: number): string {
+    const minutes = Math.max(0, Math.round(milliseconds / 60_000));
+    if (minutes < 60) return this.settings.language === 'ru' ? `${minutes} мин` : `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return this.settings.language === 'ru' ? `${hours} ч ${remainder} мин` : `${hours} h ${remainder} min`;
+  }
+
+  private async clearAnalytics(): Promise<void> {
+    await this.analyticsTracker.finish();
+    await this.analyticsRepository.clear();
+    await this.library.repository.update((state) => {
+      state.analyticsCleared = {
+        value: new Date().toISOString(),
+        revision: nextRevision(state),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    this.personalSpeed = undefined;
+    this.syncEngine.schedule();
+    await this.renderAnalytics();
   }
 
   private changeFontSize(delta: number): void {
@@ -615,6 +1006,14 @@ export class ChitalkaApp {
     this.settings.pageButtons = mode;
     document.documentElement.dataset.pageButtons = mode;
     this.saveSettings('pageButtons');
+    this.updateSettingsControls();
+  }
+
+  private setFullscreenStatus(mode: FullscreenStatusMode): void {
+    if (mode === this.settings.fullscreenStatus) return;
+    this.settings.fullscreenStatus = mode;
+    this.appRoot.dataset.fullscreenStatus = mode;
+    this.saveSettings('fullscreenStatus');
     this.updateSettingsControls();
   }
 
@@ -652,9 +1051,13 @@ export class ChitalkaApp {
     for (const input of this.pageButtonInputs) {
       input.checked = input.value === this.settings.pageButtons;
     }
+    for (const input of this.fullscreenStatusInputs) {
+      input.checked = input.value === this.settings.fullscreenStatus;
+    }
     for (const input of this.footnoteModeInputs) input.checked = input.value === this.settings.footnoteMode;
     this.fontDownButton.disabled = this.settings.fontSize <= 14;
     this.fontUpButton.disabled = this.settings.fontSize >= 28;
+    this.analyticsToggle.checked = this.settings.readingAnalytics;
   }
 
   private saveSettings<Key extends keyof ReaderSettings>(key: Key): void {
@@ -687,6 +1090,7 @@ export class ChitalkaApp {
     }
     if (!this.isPreparing) this.renderProgress(this.pager.getSnapshot());
     this.renderSyncDisplay();
+    if (this.settingsPanelController?.opened) void this.renderAnalytics();
     for (const event of this.providerStatuses.values()) this.updateProviderStatus(event);
     this.showMissingSyncConfiguration();
   }
@@ -742,7 +1146,7 @@ export class ChitalkaApp {
 
   private handleKeydown(event: KeyboardEvent): void {
     if (event.key === 'Tab') this.headerVisibility.reveal();
-    const target = event.target as HTMLElement | null;
+    const target = event.target instanceof HTMLElement ? event.target : null;
     if (!this.settingsPanel.hidden && target && this.settingsPanel.contains(target)) return;
     if (!this.tocPanel.hidden && target && this.tocPanel.contains(target)) return;
     if (!this.annotationsPanel.hidden && target && this.annotationsPanel.contains(target)) return;
@@ -807,6 +1211,10 @@ export class ChitalkaApp {
     if (isOpen) {
       this.tocPanelController.close(false);
       this.annotationPanelController.close(false);
+      this.analyticsTracker.setPaused(true);
+      void this.renderAnalytics();
+    } else {
+      this.analyticsTracker.setPaused(false);
     }
     this.syncHeaderPin();
   }
@@ -816,6 +1224,7 @@ export class ChitalkaApp {
       this.settingsPanelController.close(false);
       this.annotationPanelController.close(false);
     }
+    this.analyticsTracker.setPaused(isOpen);
     this.syncHeaderPin();
   }
 
@@ -825,6 +1234,7 @@ export class ChitalkaApp {
       this.tocPanelController.close(false);
       this.quoteMenuController.close();
     }
+    this.analyticsTracker.setPaused(isOpen);
     this.syncHeaderPin();
   }
 

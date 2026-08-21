@@ -140,7 +140,7 @@
       </div>
     </div>
 
-    <div id="app" inert aria-hidden="true">
+    <div id="app" data-pages-per-view="1" inert aria-hidden="true">
       <header id="app-header" class="app-header">
         <a class="brand" href="./" aria-label="Chitalka — home" data-i18n-aria-label="app.home">
           <img
@@ -299,11 +299,22 @@
         hidden
       >
         <div class="settings-panel-header">
-          <h2 id="settings-title" data-i18n="settings.title">Reading settings</h2>
-          <button id="settings-close" class="settings-close" type="button" aria-label="Close settings" data-i18n-aria-label="settings.close" title="Close settings" data-i18n-title="settings.close">
-            <svg class="close-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
+          <button id="settings-close" class="settings-back" type="button" aria-label="Return to reading" title="Return to reading" data-i18n-aria-label="settings.returnReading" data-i18n-title="settings.returnReading">
+            <svg class="page-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4.5-5.5 5.5 5.5 5.5" /></svg>
+            <span data-i18n="settings.returnReading">Return to reading</span>
           </button>
+          <h2 id="settings-title" data-i18n="settings.allTitle">Settings</h2>
         </div>
+
+        <div class="settings-layout">
+          <nav class="settings-navigation" aria-label="Settings sections" data-i18n-aria-label="settings.sections">
+            <button type="button" data-settings-section="reading" aria-current="page" data-i18n="settings.reading" title="General" data-i18n-title="settings.reading">General</button>
+            <button type="button" data-settings-section="analytics" data-i18n="settings.analytics" title="Analytics" data-i18n-title="settings.analytics">Analytics</button>
+            <button type="button" data-settings-section="sync" data-i18n="sync.title" title="Synchronization" data-i18n-title="sync.title">Synchronization</button>
+            <button type="button" data-settings-section="about" data-i18n="settings.about" title="About" data-i18n-title="settings.about">About</button>
+          </nav>
+          <div class="settings-content">
+            <div id="settings-reading-view" class="settings-view" data-settings-view="reading">
 
         <fieldset class="settings-group">
           <legend data-i18n="settings.fontSize">Font size</legend>
@@ -394,10 +405,74 @@
           </div>
         </fieldset>
 
+        <fieldset class="settings-group">
+          <legend data-i18n="settings.fullscreenMode">Full-screen mode</legend>
+          <div class="segmented-control">
+            <label class="setting-option">
+              <input type="radio" name="fullscreen-status" value="page" />
+              <span data-i18n="settings.fullscreenPage">Page</span>
+            </label>
+            <label class="setting-option">
+              <input type="radio" name="fullscreen-status" value="progress" />
+              <span data-i18n="settings.fullscreenProgress">Percentage</span>
+            </label>
+            <label class="setting-option">
+              <input type="radio" name="fullscreen-status" value="none" />
+              <span data-i18n="settings.fullscreenNone">Nothing</span>
+            </label>
+          </div>
+        </fieldset>
+
+            </div>
+
+            <section id="settings-analytics-view" class="settings-view analytics-view" data-settings-view="analytics" hidden>
+              <div class="analytics-heading">
+                <div>
+                  <h3 data-i18n="analytics.title">Personal analytics</h3>
+                  <p data-i18n="analytics.description">Reading data stays on this device and is synchronized through the connected private app folders.</p>
+                </div>
+                <label class="analytics-switch">
+                  <span data-i18n="analytics.toggle">Keep personal reading analytics</span>
+                  <input id="reading-analytics-toggle" type="checkbox" role="switch" />
+                  <span class="analytics-switch-track" aria-hidden="true"></span>
+                </label>
+              </div>
+              <div id="analytics-empty" class="analytics-empty">
+                <strong data-i18n="analytics.emptyTitle">Your reading statistics will appear here</strong>
+                <p data-i18n="analytics.emptyCopy">Only active reading counts. Loading, background time, pauses and rapid page skimming are excluded from reading speed.</p>
+              </div>
+              <div id="analytics-dashboard" class="analytics-dashboard" hidden>
+                <div id="analytics-summary" class="analytics-summary"></div>
+                <div class="analytics-insights">
+                  <section><h4 data-i18n="analytics.speed">Reading speed</h4><div id="analytics-speed"></div></section>
+                  <section><h4 data-i18n="analytics.forecast">Forecast for the open book</h4><div id="analytics-forecast"></div></section>
+                </div>
+                <section class="analytics-chart-section">
+                  <h4 data-i18n="analytics.week">Reading time this week</h4>
+                  <div id="analytics-week" class="analytics-week" role="img" aria-label="Reading time this week"></div>
+                </section>
+                <section class="analytics-calendar-section">
+                  <h4 data-i18n="analytics.calendar">Activity calendar</h4>
+                  <div id="analytics-calendar" class="analytics-calendar" role="img" aria-label="Reading activity calendar"></div>
+                </section>
+                <section class="analytics-sessions-section">
+                  <h4 data-i18n="analytics.sessions">Recent sessions</h4>
+                  <div id="analytics-sessions" class="analytics-sessions"></div>
+                  <button id="analytics-history-toggle" class="analytics-history-toggle" type="button" data-i18n="analytics.showAll" title="Show all history" data-i18n-title="analytics.showAll">Show all history</button>
+                </section>
+              </div>
+              <button id="analytics-clear" class="analytics-clear" type="button" disabled data-i18n="analytics.clear" title="Delete analytics data…" data-i18n-title="analytics.clear">Delete analytics data…</button>
+            </section>
+
+            <div id="settings-sync-view" class="settings-view" data-settings-view="sync" hidden>
+
         <fieldset class="settings-group sync-settings">
           <legend data-i18n="sync.title">Synchronization</legend>
           <ul class="settings-help sync-help">
-            <li data-i18n="sync.helpData">Reading position, settings, bookmarks, and quotes.</li>
+            <li data-i18n="sync.positions">Reading positions</li>
+            <li data-i18n="sync.settings">Settings</li>
+            <li data-i18n="sync.annotations">Bookmarks and quotes</li>
+            <li data-i18n="sync.analytics">Personal analytics</li>
             <li data-i18n="sync.helpAutomatic">Automatically after changes and periodically.</li>
             <li data-i18n="sync.helpMerge">Matching data is merged; the latest version wins conflicts.</li>
             <li data-i18n="sync.helpOptional">Connection is optional; books are never uploaded.</li>
@@ -422,7 +497,10 @@
           </div>
         </fieldset>
 
-        <div class="settings-project-info">
+            </div>
+
+            <div id="settings-about-view" class="settings-view" data-settings-view="about" hidden>
+        <div class="settings-project-info settings-project-info--page">
           <p>
             <span>© <time datetime="2026">2026</time></span>
             <span aria-hidden="true">·</span>
@@ -430,10 +508,24 @@
             <span aria-hidden="true">·</span>
             <a href="https://github.com/chitalka/reader/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
             <span aria-hidden="true">·</span>
-            <span>v.2.01</span>
+            <span>v.2.02</span>
           </p>
         </div>
+            </div>
+          </div>
+        </div>
       </section>
+
+      <dialog id="analytics-clear-dialog" class="analytics-clear-dialog" aria-labelledby="analytics-clear-title">
+        <form method="dialog">
+          <h2 id="analytics-clear-title" data-i18n="analytics.clearTitle">Delete analytics data?</h2>
+          <p data-i18n="analytics.clearCopy">Reading history and the calendar will be deleted from this device. Bookmarks, quotes and book progress will be preserved.</p>
+          <div>
+            <button value="cancel" data-i18n="analytics.cancel" title="Cancel" data-i18n-title="analytics.cancel">Cancel</button>
+            <button id="analytics-clear-confirm" class="destructive" value="confirm" data-i18n="analytics.delete" title="Delete" data-i18n-title="analytics.delete">Delete</button>
+          </div>
+        </form>
+      </dialog>
 
       <main id="drop-zone" class="reader-shell" aria-busy="true">
         <section id="reader-status" class="reader-status" role="status">
@@ -449,8 +541,8 @@
             <span data-i18n="reader.backToText">Back to text</span>
           </button>
 
-          <footer class="reader-footer">
-            <div class="paging-controls" aria-label="Book navigation" data-i18n-aria-label="reader.navigation">
+          <footer id="reader-footer" class="reader-footer">
+            <div id="paging-controls" class="paging-controls" aria-label="Book navigation" data-i18n-aria-label="reader.navigation">
               <button id="previous-page" class="page-button" type="button" aria-label="Previous page" data-i18n-aria-label="reader.previousPage" title="Previous page" data-i18n-title="reader.previousPage">
                 <svg class="page-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4.5-5.5 5.5 5.5 5.5" /></svg>
               </button>
@@ -464,8 +556,29 @@
                 <span id="progress-percent">0%</span>
                 <span id="page-label">Page 1 of 1</span>
                 <span id="time-label">Less than a minute left</span>
+                <span id="time-label-compact">Less than a minute left</span>
               </div>
-              <progress id="book-progress" max="100" value="0">0%</progress>
+              <div id="skim-track" class="skim-track">
+                <progress id="book-progress" max="100" value="0">0%</progress>
+                <input
+                  id="book-scrubber"
+                  class="book-scrubber"
+                  type="range"
+                  min="1"
+                  max="1"
+                  value="1"
+                  step="1"
+                  aria-label="Preview another page"
+                  data-i18n-aria-label="reader.skim"
+                  disabled
+                >
+              </div>
+              <aside id="skim-popover" class="skim-popover" role="status" hidden>
+                <strong id="skim-chapter" class="skim-chapter"></strong>
+                <div id="skim-preview" class="skim-preview"></div>
+                <span id="skim-page" class="skim-page"></span>
+                <span id="skim-hint" class="skim-hint"></span>
+              </aside>
               <span
                 id="pagination-placeholder"
                 class="pagination-placeholder"
@@ -478,6 +591,16 @@
               </span>
             </div>
 
+            <div id="fullscreen-reader-status" class="fullscreen-reader-status" aria-hidden="true">
+              <span id="fullscreen-progress-percent">0%</span>
+              <div id="fullscreen-page-viewport" class="fullscreen-page-viewport">
+                <div id="fullscreen-page-track" class="fullscreen-page-track">
+                  <div class="fullscreen-page-spread" data-pages-per-view="1">
+                    <span>1</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </footer>
         </section>
 

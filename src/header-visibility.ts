@@ -255,6 +255,7 @@ export class HeaderVisibilityController {
     private readonly idleDelay = DEFAULT_IDLE_DELAY,
     private readonly onIdleHide?: () => void,
     private readonly mode: HeaderVisibilityMode = 'auto',
+    private readonly companionControls: readonly HTMLElement[] = [],
   ) {}
 
   reveal(): void {
@@ -312,12 +313,14 @@ export class HeaderVisibilityController {
 
   private setHidden(hidden: boolean): void {
     this.root.dataset.headerVisibility = hidden ? 'hidden' : 'visible';
-    if (hidden) {
-      this.header.setAttribute('aria-hidden', 'true');
-      this.header.setAttribute('inert', '');
-    } else {
-      this.header.removeAttribute('aria-hidden');
-      this.header.removeAttribute('inert');
+    for (const element of [this.header, ...this.companionControls]) {
+      if (hidden) {
+        element.setAttribute('aria-hidden', 'true');
+        element.setAttribute('inert', '');
+      } else {
+        element.removeAttribute('aria-hidden');
+        element.removeAttribute('inert');
+      }
     }
   }
 }

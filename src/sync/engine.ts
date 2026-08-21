@@ -7,12 +7,15 @@ import {
 } from '../reader/state';
 import { BaseCloudProvider, type CloudProvider, type ProviderStatusEvent, type RemoteDocument } from './provider';
 import { t } from '../i18n';
+import type { ReadingSession } from '../reader/analytics';
 
 const SNAPSHOT_PREFIX = `chitalka-v${READER_STATE_VERSION}-`;
 const SYNC_DELAY = 2500;
 const SYNC_INTERVAL = 60_000;
 const SNAPSHOT_RETENTION = 30 * 24 * 60 * 60 * 1000;
 const MAX_SNAPSHOT_BYTES = 16 * 1024 * 1024;
+const ANALYTICS_PREFIX = 'chitalka-analytics-v1-';
+const MAX_ANALYTICS_SEGMENT_BYTES = 512 * 1024;
 
 export interface SyncEvent {
   type: 'started' | 'completed' | 'error';
@@ -31,6 +34,12 @@ export interface StateRepository {
   ): () => void;
 }
 
+export interface AnalyticsSyncRepository {
+  list(): Promise<ReadingSession[]>;
+  merge(sessions: readonly ReadingSession[]): Promise<void>;
+  clearBefore?(timestamp: string | null | undefined): Promise<void>;
+}
+
 function sortedJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map((item) => item === undefined ? 'null' : sortedJson(item)).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -47,6 +56,29 @@ function sortedJson(value: unknown): string {
 async function contentHash(content: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(content));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function encodeAnalyticsSegment(session: ReadingSession): Promise<{ content: string; name: string }> {
+  const content = sortedJson({ schemaVersion: 1, sessions: [session] });
+  const hash = await contentHash(content);
+  return {
+    content,
+    name: `${ANALYTICS_PREFIX}${session.deviceId}-${session.id}-${hash}.json`,
+  };
+}
+
+async function parseAnalyticsSegment(document: RemoteDocument, content: string): Promise<ReadingSession[] | undefined> {
+  if (!document.name.startsWith(ANALYTICS_PREFIX) || new Blob([content]).size > MAX_ANALYTICS_SEGMENT_BYTES) return undefined;
+  const match = document.name.match(/^chitalka-analytics-v1-(.+)-([0-9a-f-]+)-([0-9a-f]{64})\.json$/u);
+  if (!match) return undefined;
+  try {
+    const value = JSON.parse(content) as { schemaVersion?: number; sessions?: ReadingSession[] };
+    if (value.schemaVersion !== 1 || !Array.isArray(value.sessions)) return undefined;
+    if (await contentHash(content) !== match[3]) return undefined;
+    return value.sessions.filter((session) => session && typeof session.id === 'string' && typeof session.deviceId === 'string');
+  } catch {
+    return undefined;
+  }
 }
 
 function parseSnapshot(content: string): SyncSnapshot | undefined {
@@ -102,6 +134,7 @@ export class SyncEngine {
   constructor(
     private readonly repository: StateRepository,
     readonly providers: CloudProvider[],
+    private readonly analytics?: AnalyticsSyncRepository,
   ) {
     repository.subscribe((_state, source) => {
       if (source === 'local') this.schedule();
@@ -155,6 +188,13 @@ export class SyncEngine {
           const validNames = new Set<string>();
           providerValidNames.set(provider, validNames);
           for (const document of documents) {
+            if (document.name.startsWith(ANALYTICS_PREFIX)) {
+              const content = await provider.download(document);
+              const sessions = await parseAnalyticsSegment(document, content);
+              if (sessions) await this.analytics?.merge(sessions);
+              else this.emit({ type: 'error', message: t('error.snapshotCorrupt', { provider: provider.label, name: document.name }) });
+              continue;
+            }
             const cached = this.snapshotCache.get(document.name);
             if (cached) {
               merged = mergeReaderStates(merged, cached.state);
@@ -180,6 +220,7 @@ export class SyncEngine {
       }
 
       merged = compactTombstones(merged);
+      await this.analytics?.clearBefore?.(merged.analyticsCleared?.value);
 
       const before = sortedJson(await this.repository.read());
       const after = sortedJson(merged);
@@ -212,6 +253,9 @@ export class SyncEngine {
       this.snapshotCache.set(name, snapshot);
 
       let allProvidersConverged = true;
+      const analyticsSegments = this.analytics
+        ? await Promise.all((await this.analytics.list()).map((session) => encodeAnalyticsSegment(session)))
+        : [];
       for (const provider of providers) {
         const documents = providerDocuments.get(provider);
         const validNames = providerValidNames.get(provider);
@@ -234,6 +278,15 @@ export class SyncEngine {
         } catch (error) {
           allProvidersConverged = false;
           this.emit({ type: 'error', message: error instanceof Error ? error.message : t('error.upload') });
+        }
+      }
+
+      for (const provider of providers) {
+        const documents = providerDocuments.get(provider);
+        if (!documents) continue;
+        const names = new Set(documents.map((document) => document.name));
+        for (const segment of analyticsSegments) {
+          if (!names.has(segment.name)) await provider.upload(segment.name, segment.content);
         }
       }
 

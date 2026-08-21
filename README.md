@@ -2,6 +2,8 @@
 
 Chitalka is a fast, local-first browser reader for FB2 and EPUB books. Files selected by the reader are processed entirely in the browser and are never uploaded to a server.
 
+[English Telegram channel](https://t.me/chitalka_reader)
+
 [Open the live demo](https://chitalka.github.io/demo/)
 
 ## Features
@@ -12,10 +14,12 @@ Chitalka is a fast, local-first browser reader for FB2 and EPUB books. Files sel
 - Extracts hierarchical tables of contents from FB2 sections, EPUB 3 navigation documents, and EPUB 2 NCX files, with heading-based EPUB fallback navigation.
 - Uses an adaptive one- or two-page layout with virtualized chapters for fast loading and resizing.
 - Supports page buttons, keyboard navigation, touch swipes, and accelerated page turns from repeated input.
+- Previews pages and spreads from the progress bar without moving the active reading position until the preview is confirmed.
 - Keeps compact floating controls visible and interactive without shifting the book layout.
-- Offers adjustable font size, light and dark themes, one- or two-page modes, footnote modes, and configurable page buttons.
+- Offers adjustable font size, light and dark themes, one- or two-page modes, footnote modes, configurable page buttons, and a choice of the status that remains visible in full-screen reading.
 - Saves books, settings, reading positions, bookmarks, and highlighted quotes locally in IndexedDB. Books are identified by the SHA-256 hash of their original bytes, so renaming a file does not lose its state.
 - Supports optional, local-first synchronization through the private application folders in Google Drive and Yandex Disk. Both providers can be connected at the same time.
+- Offers optional personal reading analytics with active-time sessions, reading speed, an activity calendar, and completion forecasts; analytics remains local unless private-folder synchronization is connected.
 - Adds bookmarks at the current reading position and persistent highlighted quotes in six colors, with an optional note for either type.
 - Displays embedded covers and illustrations and estimates the remaining reading time.
 

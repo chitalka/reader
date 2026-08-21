@@ -1,7 +1,7 @@
 {
   "name": "chitalka",
-  "version": "2.1.0",
-  "displayVersion": "2.01",
+  "version": "2.2.0",
+  "displayVersion": "2.02",
   "private": true,
   "type": "module",
   "description": "A modern, browser-based FB2 and EPUB reader",

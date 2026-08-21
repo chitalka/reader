@@ -14,6 +14,25 @@ export interface PagerSnapshot {
   chunkPage: number;
 }
 
+export interface PageTurnMotion {
+  startOffset: number;
+  spreadDistance: number;
+  duration: number;
+  easing: string;
+}
+
+export interface SkimTarget {
+  currentPage: number;
+  lastPage: number;
+  totalPages: number;
+  pagesPerView: number;
+  progress: number;
+  chunkIndex: number;
+  chunkPage: number;
+  bookGeneration: number;
+  layoutKey: string;
+}
+
 export interface RestorePosition {
   anchor?: string;
   column?: number;
@@ -32,6 +51,7 @@ interface LayoutGeometry {
   columnGap: number;
   columnWidth: number;
   key: string;
+  pageContentHeight: number;
   pageExtent: number;
   viewportHeight: number;
   viewportWidth: number;
@@ -44,6 +64,9 @@ interface IdleCallbacks {
 
 const PAGE_TURN_DURATION = MOTION_DURATION.page;
 const PAGE_TURN_EASING = MOTION_EASING.move;
+const MEASUREMENT_DELAY_MS = 32;
+const IDLE_MEASUREMENT_WATCHDOG_MS = 300;
+const MEASUREMENT_BATCH_SIZE = 4;
 
 export class ReaderPager {
   private currentColumn = 0;
@@ -70,10 +93,12 @@ export class ReaderPager {
   private layout?: LayoutGeometry;
   private estimatedWordsPerPage = 100;
   private measurementGeneration = 0;
-  private measurementHandle?: number;
-  private measurementUsesIdleCallback = false;
+  private measurementIdleHandle?: number;
+  private measurementTimeoutHandle?: number;
+  private idleMeasurementsReliable = true;
   private bookGeneration = 0;
   private pageAnimation?: Animation;
+  private companionAnimation?: Animation;
   private viewTransition?: ViewTransition;
   private viewTransitionGeneration = 0;
   private transitionUpdatePending = false;
@@ -85,7 +110,8 @@ export class ReaderPager {
   constructor(
     private readonly viewport: HTMLElement,
     private readonly content: HTMLElement,
-    private readonly onChange: (snapshot: PagerSnapshot) => void,
+    private readonly onChange: (snapshot: PagerSnapshot, motion?: PageTurnMotion) => void,
+    private readonly motionCompanion?: HTMLElement,
   ) {
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(() => this.scheduleLayout());
@@ -192,6 +218,7 @@ export class ReaderPager {
     this.swipeOffset = offset;
     this.content.classList.add('is-swiping');
     this.content.style.transform = `translateX(${offset}px)`;
+    if (this.motionCompanion) this.motionCompanion.style.transform = `translateX(${offset}px)`;
   }
 
   updateSwipe(distance: number): void {
@@ -199,6 +226,9 @@ export class ReaderPager {
     const atBoundary = (distance > 0 && this.isFirst()) || (distance < 0 && this.isLast());
     this.swipeOffset = this.swipeBaseOffset + distance * (atBoundary ? 0.28 : 1);
     this.content.style.transform = `translateX(${this.swipeOffset}px)`;
+    if (this.motionCompanion) {
+      this.motionCompanion.style.transform = `translateX(${this.swipeOffset}px)`;
+    }
   }
 
   finishSwipe(direction: -1 | 0 | 1): boolean {
@@ -221,17 +251,12 @@ export class ReaderPager {
       || this.prefersReducedMotion()
       || typeof this.content.animate !== 'function'
     ) return;
-    const animation = this.content.animate(
-      [
-        { transform: `translateX(${offset}px)` },
-        { transform: 'translateX(0)' },
-      ],
-      { duration: MOTION_DURATION.exit, easing: MOTION_EASING.enter },
-    );
-    this.pageAnimation = animation;
-    void animation.finished.then(() => {
-      if (this.pageAnimation === animation) this.pageAnimation = undefined;
-    }).catch(() => undefined);
+    this.animatePageTurn({
+      startOffset: offset,
+      spreadDistance: Math.max(1, this.pageExtent * this.pagesPerView),
+      duration: MOTION_DURATION.exit,
+      easing: MOTION_EASING.enter,
+    });
   }
 
   first(): void {
@@ -363,6 +388,120 @@ export class ReaderPager {
       chunkIndex: this.currentChunkIndex,
       chunkPage: this.currentColumn + 1,
     };
+  }
+
+  skimTarget(requestedPage: number): SkimTarget | undefined {
+    if (!this.layout || !this.navigationChunks.length) return undefined;
+    const counts = this.navigationChunks.map((chunkIndex) => this.pageCountForSnapshot(chunkIndex));
+    const totalPages = Math.max(1, counts.reduce((sum, count) => sum + count, 0));
+    let remaining = Math.max(1, Math.min(totalPages, Math.round(requestedPage)));
+    let pagesBefore = 0;
+
+    for (let index = 0; index < this.navigationChunks.length; index += 1) {
+      const count = counts[index] ?? 1;
+      if (remaining > count && index < this.navigationChunks.length - 1) {
+        remaining -= count;
+        pagesBefore += count;
+        continue;
+      }
+      const chunkIndex = this.navigationChunks[index]!;
+      const chunkColumn = Math.floor((remaining - 1) / this.pagesPerView) * this.pagesPerView;
+      const currentPage = Math.min(totalPages, pagesBefore + chunkColumn + 1);
+      const lastPage = Math.min(totalPages, currentPage + this.pagesPerView - 1, pagesBefore + count);
+      return {
+        currentPage,
+        lastPage,
+        totalPages,
+        pagesPerView: this.pagesPerView,
+        progress: totalPages <= 1 ? 100 : (lastPage / totalPages) * 100,
+        chunkIndex,
+        chunkPage: chunkColumn + 1,
+        bookGeneration: this.bookGeneration,
+        layoutKey: this.layout.key,
+      };
+    }
+    return undefined;
+  }
+
+  renderSkimPreview(target: SkimTarget, host: HTMLElement): string | undefined {
+    const geometry = this.layout;
+    const chunk = this.chunks[target.chunkIndex];
+    if (
+      !this.bookRoot
+      || !geometry
+      || !chunk
+      || target.bookGeneration !== this.bookGeneration
+      || target.layoutKey !== geometry.key
+    ) return undefined;
+
+    const preview = document.createElement('article');
+    preview.className = 'book-content skim-preview-content';
+    preview.setAttribute('aria-hidden', 'true');
+    preview.style.width = `${geometry.viewportWidth}px`;
+    preview.style.height = `${geometry.viewportHeight}px`;
+    preview.style.fontSize = `${this.fontSize}px`;
+    this.applyGeometry(preview, geometry);
+
+    const book = this.bookRoot.cloneNode(false) as HTMLElement;
+    const clone = chunk.element.cloneNode(true) as HTMLElement;
+    clone.removeAttribute('id');
+    for (const element of Array.from(clone.querySelectorAll<HTMLElement>('[id]'))) {
+      element.removeAttribute('id');
+    }
+    book.append(clone);
+    preview.append(book);
+    host.replaceChildren(preview);
+    host.style.aspectRatio = `${geometry.viewportWidth} / ${geometry.viewportHeight}`;
+    void preview.offsetWidth;
+
+    const chunkColumn = target.chunkPage - 1;
+    const contentLeft = preview.getBoundingClientRect().left;
+    const firstVisibleAnchor = [clone, ...Array.from(clone.querySelectorAll<HTMLElement>('[data-reader-anchor]'))]
+      .filter((element) => element.dataset.readerAnchor !== undefined)
+      .map((element, order) => {
+        const rect = element.getClientRects()[0];
+        const page = rect
+          ? Math.max(0, Math.floor((rect.left - contentLeft) / geometry.pageExtent + 0.02))
+          : -1;
+        return { element, order, page, top: rect?.top ?? Number.MAX_SAFE_INTEGER };
+      })
+      .filter(({ page }) => page >= chunkColumn && page < chunkColumn + target.pagesPerView)
+      .sort((first, second) => first.page - second.page || first.top - second.top || first.order - second.order)[0]
+      ?.element.dataset.readerAnchor;
+
+    const scale = Math.max(0.01, Math.min(
+      host.clientWidth / geometry.viewportWidth,
+      host.clientHeight / geometry.viewportHeight,
+    ));
+    preview.style.left = `${Math.max(0, (host.clientWidth - geometry.viewportWidth * scale) / 2)}px`;
+    preview.style.transform = `scale(${scale}) translateX(${-chunkColumn * geometry.pageExtent}px)`;
+    return firstVisibleAnchor;
+  }
+
+  commitSkim(target: SkimTarget): boolean {
+    if (
+      !this.layout
+      || target.bookGeneration !== this.bookGeneration
+      || target.layoutKey !== this.layout.key
+      || !this.navigationChunks.includes(target.chunkIndex)
+    ) return false;
+
+    const targetColumn = target.chunkPage - 1;
+    if (target.chunkIndex === this.currentChunkIndex) {
+      this.cancelNavigationAnimations();
+      this.activeAnchor = undefined;
+      this.currentColumn = Math.min(
+        Math.floor(targetColumn / this.pagesPerView) * this.pagesPerView,
+        this.lastSpreadStart(),
+      );
+      this.moveToCurrent(true, true);
+      return true;
+    }
+
+    const direction = this.navigationChunks.indexOf(target.chunkIndex)
+      > this.navigationChunks.indexOf(this.currentChunkIndex) ? 1 : -1;
+    this.transitionToChunk(target.chunkIndex, targetColumn, direction);
+    return true;
   }
 
   private readonly handleWindowResize = (): void => {
@@ -537,6 +676,10 @@ export class ReaderPager {
     this.layout = geometry;
     this.pagesPerView = this.pagesForViewport(geometry.viewportWidth);
     this.pageExtent = geometry.pageExtent;
+    this.motionCompanion?.style.setProperty(
+      '--reader-page-turn-distance',
+      `${this.pageExtent * this.pagesPerView}px`,
+    );
     this.applyGeometry(this.content, geometry);
     void this.content.offsetWidth;
 
@@ -576,6 +719,10 @@ export class ReaderPager {
   private calculateGeometry(): LayoutGeometry {
     const viewportWidth = Math.max(1, this.viewport.clientWidth);
     const viewportHeight = Math.max(1, this.viewport.clientHeight);
+    const contentStyle = window.getComputedStyle(this.content);
+    const verticalPadding = (Number.parseFloat(contentStyle.paddingTop) || 0)
+      + (Number.parseFloat(contentStyle.paddingBottom) || 0);
+    const pageContentHeight = Math.max(1, viewportHeight - verticalPadding);
     const pagesPerView = this.pagesForViewport(viewportWidth);
     const pageGap = viewportWidth < 640 ? 20 : 36;
     const innerPageMargin = pagesPerView === 2 ? (viewportWidth < 640 ? 24 : 48) : 0;
@@ -590,6 +737,7 @@ export class ReaderPager {
     return {
       columnGap,
       columnWidth,
+      pageContentHeight,
       pageExtent,
       viewportHeight,
       viewportWidth,
@@ -606,6 +754,7 @@ export class ReaderPager {
     target.style.width = `${geometry.viewportWidth}px`;
     target.style.setProperty('--page-width', `${geometry.columnWidth}px`);
     target.style.setProperty('--page-gap', `${geometry.columnGap}px`);
+    target.style.setProperty('--page-content-height', `${geometry.pageContentHeight}px`);
   }
 
   private pagesForElement(
@@ -737,16 +886,19 @@ export class ReaderPager {
 
   private moveToCurrent(smooth: boolean, captureAnchor = false): void {
     const left = this.currentColumn * this.pageExtent;
-    if (smooth) this.animateScrollTo(left);
-    else {
+    let motion: PageTurnMotion | undefined;
+    if (smooth) {
+      motion = this.prepareScrollTo(left);
+    } else {
       this.cancelPageAnimation();
       this.viewport.scrollTo({ left, behavior: 'auto' });
     }
     if (captureAnchor) this.captureVisibleAnchor();
-    this.onChange(this.getSnapshot());
+    this.onChange(this.getSnapshot(), motion);
+    if (motion) this.animatePageTurn(motion);
   }
 
-  private animateScrollTo(left: number): void {
+  private prepareScrollTo(left: number): PageTurnMotion | undefined {
     const previousLeft = this.viewport.scrollLeft;
     const animatedOffset = this.currentAnimatedOffset();
     this.cancelPageAnimation();
@@ -758,21 +910,31 @@ export class ReaderPager {
       Math.abs(startOffset) < 0.5
       || this.prefersReducedMotion()
       || typeof this.content.animate !== 'function'
-    ) return;
+    ) return undefined;
 
     const spreadDistance = Math.max(1, this.pageExtent * this.pagesPerView);
     const queuedSpreads = Math.max(1, Math.abs(startOffset) / spreadDistance);
     const duration = Math.max(90, Math.round(PAGE_TURN_DURATION / Math.sqrt(queuedSpreads)));
-    const animation = this.content.animate(
-      [
-        { transform: `translateX(${startOffset}px)` },
-        { transform: 'translateX(0)' },
-      ],
-      { duration, easing: PAGE_TURN_EASING },
-    );
+    return { startOffset, spreadDistance, duration, easing: PAGE_TURN_EASING };
+  }
+
+  private animatePageTurn(motion: PageTurnMotion): void {
+    const keyframes = [
+      { transform: `translateX(${motion.startOffset}px)` },
+      { transform: 'translateX(0)' },
+    ];
+    const options = { duration: motion.duration, easing: motion.easing };
+    const animation = this.content.animate(keyframes, options);
     this.pageAnimation = animation;
     void animation.finished.then(() => {
       if (this.pageAnimation === animation) this.pageAnimation = undefined;
+    }).catch(() => undefined);
+
+    if (!this.motionCompanion || typeof this.motionCompanion.animate !== 'function') return;
+    const companionAnimation = this.motionCompanion.animate(keyframes, options);
+    this.companionAnimation = companionAnimation;
+    void companionAnimation.finished.then(() => {
+      if (this.companionAnimation === companionAnimation) this.companionAnimation = undefined;
     }).catch(() => undefined);
   }
 
@@ -829,17 +991,12 @@ export class ReaderPager {
   private animateChunkEntry(direction: -1 | 1): void {
     if (this.prefersReducedMotion() || typeof this.content.animate !== 'function') return;
     const distance = Math.min(96, Math.max(40, this.viewport.clientWidth * 0.1));
-    const animation = this.content.animate(
-      [
-        { opacity: 0.78, transform: `translateX(${direction * distance}px)` },
-        { opacity: 1, transform: 'translateX(0)' },
-      ],
-      { duration: MOTION_DURATION.routine, easing: MOTION_EASING.enter },
-    );
-    this.pageAnimation = animation;
-    void animation.finished.then(() => {
-      if (this.pageAnimation === animation) this.pageAnimation = undefined;
-    }).catch(() => undefined);
+    this.animatePageTurn({
+      startOffset: direction * distance,
+      spreadDistance: Math.max(1, this.pageExtent * this.pagesPerView),
+      duration: MOTION_DURATION.routine,
+      easing: MOTION_EASING.enter,
+    });
   }
 
   private currentAnimatedOffset(): number {
@@ -860,6 +1017,8 @@ export class ReaderPager {
   private cancelPageAnimation(): void {
     this.pageAnimation?.cancel();
     this.pageAnimation = undefined;
+    this.companionAnimation?.cancel();
+    this.companionAnimation = undefined;
   }
 
   private cancelNavigationAnimations(): void {
@@ -884,6 +1043,7 @@ export class ReaderPager {
     this.swipeOffset = 0;
     this.content.classList.remove('is-swiping');
     this.content.style.removeProperty('transform');
+    this.motionCompanion?.style.removeProperty('transform');
   }
 
   private initialWordsPerPage(geometry: LayoutGeometry): number {
@@ -932,15 +1092,15 @@ export class ReaderPager {
       ));
 
     const measureNext = (): void => {
-      this.measurementHandle = undefined;
       if (generation !== this.measurementGeneration || geometry.key !== this.layout?.key) return;
-      const chunkIndex = queue.shift();
-      if (chunkIndex === undefined) {
+      const chunkIndices = queue.splice(0, MEASUREMENT_BATCH_SIZE);
+      if (!chunkIndices.length) {
         this.onChange(this.getSnapshot());
         return;
       }
-      const pageCount = this.measureChunk(chunkIndex, geometry);
-      this.recordPageCount(chunkIndex, pageCount);
+      for (const [chunkIndex, pageCount] of this.measureChunks(chunkIndices, geometry)) {
+        this.recordPageCount(chunkIndex, pageCount);
+      }
       this.scheduleMeasurement(measureNext);
     };
 
@@ -953,51 +1113,107 @@ export class ReaderPager {
 
   private scheduleMeasurement(callback: () => void): void {
     const idleWindow = window as unknown as IdleCallbacks;
-    if (idleWindow.requestIdleCallback) {
-      this.measurementUsesIdleCallback = true;
-      this.measurementHandle = idleWindow.requestIdleCallback(callback, { timeout: 250 });
-    } else {
-      this.measurementUsesIdleCallback = false;
-      this.measurementHandle = window.setTimeout(callback, 32);
+    let completed = false;
+    let idleHandle: number | undefined;
+    let timeoutHandle: number | undefined;
+    const run = (source: 'idle' | 'timer'): void => {
+      if (completed) return;
+      completed = true;
+      if (source === 'timer' && idleHandle !== undefined) {
+        this.idleMeasurementsReliable = false;
+      }
+      if (source === 'timer' && idleHandle !== undefined) {
+        try {
+          idleWindow.cancelIdleCallback?.(idleHandle);
+        } catch {
+          // A late or already-running WebKit callback must not stop the queue.
+        }
+      }
+      if (this.measurementIdleHandle === idleHandle) {
+        this.measurementIdleHandle = undefined;
+      }
+      if (timeoutHandle !== undefined) window.clearTimeout(timeoutHandle);
+      if (this.measurementTimeoutHandle === timeoutHandle) {
+        this.measurementTimeoutHandle = undefined;
+      }
+      callback();
+    };
+
+    if (idleWindow.requestIdleCallback && this.idleMeasurementsReliable) {
+      idleHandle = idleWindow.requestIdleCallback(
+        () => run('idle'),
+        { timeout: 250 },
+      );
+      this.measurementIdleHandle = idleHandle;
+      // WebKit may never invoke requestIdleCallback, including its timeout path.
+      timeoutHandle = window.setTimeout(
+        () => run('timer'),
+        IDLE_MEASUREMENT_WATCHDOG_MS,
+      );
+      this.measurementTimeoutHandle = timeoutHandle;
+      return;
     }
+    timeoutHandle = window.setTimeout(
+      () => run('timer'),
+      MEASUREMENT_DELAY_MS,
+    );
+    this.measurementTimeoutHandle = timeoutHandle;
   }
 
   private cancelMeasurements(): void {
     this.measurementGeneration += 1;
-    if (this.measurementHandle === undefined) return;
     const idleWindow = window as unknown as IdleCallbacks;
-    if (this.measurementUsesIdleCallback && idleWindow.cancelIdleCallback) {
-      idleWindow.cancelIdleCallback(this.measurementHandle);
-    } else {
-      window.clearTimeout(this.measurementHandle);
+    if (this.measurementIdleHandle !== undefined) {
+      try {
+        idleWindow.cancelIdleCallback?.(this.measurementIdleHandle);
+      } catch {
+        // WebKit can deliver an idle callback while its cancellation is racing.
+      }
+      this.measurementIdleHandle = undefined;
     }
-    this.measurementHandle = undefined;
+    if (this.measurementTimeoutHandle !== undefined) {
+      window.clearTimeout(this.measurementTimeoutHandle);
+      this.measurementTimeoutHandle = undefined;
+    }
   }
 
-  private measureChunk(chunkIndex: number, geometry: LayoutGeometry): number {
-    if (!this.bookRoot) return 1;
-    const chunk = this.chunks[chunkIndex];
-    if (!chunk) return 1;
+  private measureChunks(
+    chunkIndices: readonly number[],
+    geometry: LayoutGeometry,
+  ): Map<number, number> {
+    const counts = new Map<number, number>();
+    if (!this.bookRoot) return counts;
+    const measurements = chunkIndices.flatMap((chunkIndex) => {
+      const chunk = this.chunks[chunkIndex];
+      if (!chunk) return [];
 
-    const measurer = document.createElement('article');
-    measurer.className = 'book-content reader-measurer';
-    measurer.setAttribute('aria-hidden', 'true');
-    measurer.style.height = `${Math.max(1, this.content.clientHeight)}px`;
-    measurer.style.fontSize = `${this.fontSize}px`;
-    this.applyGeometry(measurer, geometry);
+      const measurer = document.createElement('article');
+      measurer.className = 'book-content reader-measurer';
+      measurer.setAttribute('aria-hidden', 'true');
+      measurer.style.height = `${Math.max(1, this.content.clientHeight)}px`;
+      measurer.style.fontSize = `${this.fontSize}px`;
+      this.applyGeometry(measurer, geometry);
 
-    const book = this.bookRoot.cloneNode(false) as HTMLElement;
-    const clone = chunk.element.cloneNode(true) as HTMLElement;
-    clone.removeAttribute('id');
-    for (const element of Array.from(clone.querySelectorAll<HTMLElement>('[id]'))) {
-      element.removeAttribute('id');
+      const book = this.bookRoot!.cloneNode(false) as HTMLElement;
+      const clone = chunk.element.cloneNode(true) as HTMLElement;
+      clone.removeAttribute('id');
+      for (const element of Array.from(clone.querySelectorAll<HTMLElement>('[id]'))) {
+        element.removeAttribute('id');
+      }
+      book.append(clone);
+      measurer.append(book);
+      return [{ chunkIndex, clone, measurer }];
+    });
+
+    document.body.append(...measurements.map(({ measurer }) => measurer));
+    try {
+      void measurements[0]?.measurer.offsetWidth;
+      for (const { chunkIndex, clone, measurer } of measurements) {
+        counts.set(chunkIndex, this.pagesForElement(measurer, clone, geometry));
+      }
+    } finally {
+      for (const { measurer } of measurements) measurer.remove();
     }
-    book.append(clone);
-    measurer.append(book);
-    document.body.append(measurer);
-    void measurer.offsetWidth;
-    const pageCount = this.pagesForElement(measurer, clone, geometry);
-    measurer.remove();
-    return pageCount;
+    return counts;
   }
 }

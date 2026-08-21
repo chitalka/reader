@@ -60,6 +60,31 @@ describe('HeaderVisibilityController', () => {
     expect(header.hasAttribute('inert')).toBe(true);
   });
 
+  it('keeps companion controls synchronized with the header', () => {
+    const footerControls = document.createElement('div');
+    controller.destroy();
+    controller = new HeaderVisibilityController(
+      root,
+      header,
+      5_000,
+      undefined,
+      'auto',
+      [footerControls],
+    );
+
+    controller.reveal();
+    expect(footerControls.hasAttribute('inert')).toBe(false);
+
+    controller.hide();
+    expect(root.dataset.headerVisibility).toBe('hidden');
+    expect(footerControls.getAttribute('aria-hidden')).toBe('true');
+    expect(footerControls.hasAttribute('inert')).toBe(true);
+
+    controller.reveal();
+    expect(footerControls.hasAttribute('aria-hidden')).toBe(false);
+    expect(footerControls.hasAttribute('inert')).toBe(false);
+  });
+
   it('reports automatic idle hides but not explicit reading actions', () => {
     const onIdleHide = vi.fn();
     controller.destroy();

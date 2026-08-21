@@ -49,6 +49,21 @@ describe('reader shell accessibility', () => {
     expect(themes.map((input) => input.value)).toEqual(['light', 'auto', 'dark']);
   });
 
+  it('offers page, percentage, and nothing for full-screen mode', () => {
+    const modes = Array.from(
+      markup.querySelectorAll<HTMLInputElement>('input[name="fullscreen-status"]'),
+    );
+    expect(modes.map((input) => input.value)).toEqual(['page', 'progress', 'none']);
+    expect(markup.querySelector('#time-label-compact')).not.toBeNull();
+    const fullscreenStatus = markup.querySelector('#fullscreen-reader-status');
+    expect(fullscreenStatus?.getAttribute('aria-hidden')).toBe('true');
+    expect(fullscreenStatus?.querySelector('#fullscreen-progress-percent')).not.toBeNull();
+    expect(fullscreenStatus?.querySelector('#fullscreen-page-viewport')).not.toBeNull();
+    expect(fullscreenStatus?.querySelector('#fullscreen-page-track')).not.toBeNull();
+    expect(fullscreenStatus?.querySelector('.fullscreen-page-spread')?.textContent?.trim())
+      .toBe('1');
+  });
+
   it('publishes the author, license, year, and public release version in settings', () => {
     const projectInfo = markup.querySelector<HTMLElement>('.settings-project-info');
     const author = projectInfo?.querySelector<HTMLAnchorElement>('a[href="https://t.me/olegmokhov"]');
@@ -62,7 +77,7 @@ describe('reader shell accessibility', () => {
     expect(author?.getAttribute('rel')).toBe('noopener noreferrer');
     expect(license?.textContent).toBe('MIT License');
     expect(projectInfo?.textContent?.replace(/\s+/gu, ' ').trim())
-      .toBe('© 2026 · Oleg Mokhov · MIT License · v.2.01');
+      .toBe('© 2026 · Oleg Mokhov · MIT License · v.2.02');
   });
 
   it('covers the unfinished reader with an accessible initial splash', () => {

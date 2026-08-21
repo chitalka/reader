@@ -103,7 +103,7 @@ export class SettingsPanelController {
 
     if (event.key !== 'Tab') return;
     const focusable = Array.from(this.elements.panel.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:checked:not([disabled])',
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]',
     ));
     const first = focusable[0];
     const last = focusable[focusable.length - 1];

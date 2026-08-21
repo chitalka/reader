@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyReaderState, type ReaderState, type SyncSnapshot } from '../reader/state';
-import { encodeSnapshot, SyncEngine, type StateRepository } from './engine';
+import { encodeAnalyticsSegment, encodeSnapshot, SyncEngine, type AnalyticsSyncRepository, type StateRepository } from './engine';
+import type { ReadingSession } from '../reader/analytics';
 import type {
   CloudProvider,
   ProviderId,
@@ -61,6 +62,23 @@ class MemoryProvider implements CloudProvider {
     listener({ provider: this.id, status: this.status });
     return () => undefined;
   }
+}
+
+class MemoryAnalytics implements AnalyticsSyncRepository {
+  constructor(readonly sessions = new Map<string, ReadingSession>()) {}
+  async list(): Promise<ReadingSession[]> { return Array.from(this.sessions.values()); }
+  async merge(values: readonly ReadingSession[]): Promise<void> {
+    values.forEach((value) => this.sessions.set(value.id, structuredClone(value)));
+  }
+}
+
+function readingSession(id: string, deviceId: string): ReadingSession {
+  return {
+    id, deviceId, bookFingerprint: 'book', bookTitle: 'Book',
+    startedAt: '2026-01-01T10:00:00.000Z', endedAt: '2026-01-01T10:10:00.000Z',
+    activeMs: 600_000, speedSampleMs: 600_000, screensRead: 8, wordsRead: 2_000,
+    charactersRead: 12_000, startProgress: 10, endProgress: 20,
+  };
 }
 
 describe('SyncEngine', () => {
@@ -128,6 +146,24 @@ describe('SyncEngine', () => {
     await engine.syncNow();
 
     expect(Array.from(google.documents.entries())).toEqual(Array.from(yandex.documents.entries()));
+    engine.destroy();
+  });
+
+  it('pulls and uploads immutable analytics segments without duplicates', async () => {
+    const repository = new MemoryRepository(createEmptyReaderState('local-device'));
+    const provider = new MemoryProvider();
+    const remote = readingSession('11111111-1111-4111-8111-111111111111', 'remote-device');
+    const encoded = await encodeAnalyticsSegment(remote);
+    provider.documents.set(encoded.name, encoded.content);
+    const analytics = new MemoryAnalytics(new Map([
+      ['22222222-2222-4222-8222-222222222222', readingSession('22222222-2222-4222-8222-222222222222', 'local-device')],
+    ]));
+    const engine = new SyncEngine(repository, [provider], analytics);
+
+    await engine.syncNow();
+
+    expect(analytics.sessions.has(remote.id)).toBe(true);
+    expect(Array.from(provider.documents.keys()).filter((name) => name.startsWith('chitalka-analytics-v1-'))).toHaveLength(2);
     engine.destroy();
   });
 

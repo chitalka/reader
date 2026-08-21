@@ -2,6 +2,29 @@
 
 All notable public changes to Chitalka are documented in this file.
 
+## [2.02] - 2026-08-21
+
+### Added
+
+- Added non-destructive page and spread previews to the reading progress bar, with chapter hierarchy, pointer dragging, keyboard confirmation, and cancellation.
+- Added opt-in personal reading analytics with active-time tracking, session history, an activity calendar, reading speed in words and characters, and a completion forecast for the open book.
+- Added analytics synchronization through the connected private Google Drive and Yandex Disk application folders without uploading book files.
+- Added a dedicated settings screen with General, Analytics, Synchronization, and About sections.
+- Added a full-screen status preference that can keep the current page, reading percentage, or nothing visible while the reading controls are hidden.
+
+### Changed
+
+- The header and footer now hide and return together without shifting the book; page numbers remain centered under one- and two-page layouts and move with the pages during navigation.
+- The mobile remaining-time label now uses a compact formulation while preserving the complete estimate.
+- Reading preferences and analytics controls use more generous spacing on desktop and mobile.
+- EPUB pagination measures background chapters in small batches to finish exact page counts substantially faster in Safari.
+
+### Fixed
+
+- Fixed EPUB books remaining indefinitely in the page-counting state in macOS and iOS Safari.
+- Fixed EPUB illustrations and captions splitting across pages; images now scale to fit the available page width and height while preserving proportions.
+- Fixed hidden footer controls remaining interactive and ensured full-screen page indicators stay synchronized during buttons, keyboard navigation, rapid turns, and touch swipes.
+
 ## [2.01] - 2026-08-19
 
 ### Added
@@ -34,4 +57,5 @@ All notable public changes to Chitalka are documented in this file.
 - Included optional synchronization through private application folders in Google Drive and Yandex Disk.
 - Published the installable PWA demo at <https://chitalka.github.io/demo/>.
 
+[2.02]: https://github.com/chitalka/reader/releases/tag/v2.02
 [2.01]: https://github.com/chitalka/reader/releases/tag/v2.01

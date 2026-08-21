@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyDocumentTranslations,
+  formatCompactTimeLeft,
   getLanguage,
   normalizeLanguage,
   setLanguage,
@@ -47,5 +48,17 @@ describe('interface localization', () => {
     expect(t('reader.page', { current: 3, total: 10 })).toBe('Page 3 of 10');
     setLanguage('ru');
     expect(t('reader.page', { current: 3, total: 10 })).toBe('Страница 3 из 10');
+  });
+
+  it('formats compact remaining time for mobile in both languages', () => {
+    expect(formatCompactTimeLeft(125)).toBe('2 hr 5 min left');
+    expect(formatCompactTimeLeft(120)).toBe('2 hr left');
+    expect(formatCompactTimeLeft(25)).toBe('25 min left');
+
+    setLanguage('ru');
+    expect(formatCompactTimeLeft(125)).toBe('До конца 2 часа 5 минут');
+    expect(formatCompactTimeLeft(61)).toBe('До конца 1 час 1 минута');
+    expect(formatCompactTimeLeft(120)).toBe('До конца 2 часа');
+    expect(formatCompactTimeLeft(25)).toBe('До конца 25 минут');
   });
 });

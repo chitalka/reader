@@ -354,19 +354,28 @@ export function renderEpub(parsed: ParsedEpub): RenderedBook {
     return dataUrl;
   };
 
-  const createImage = (path: string, alt = ''): HTMLElement | undefined => {
+  const createImageElement = (
+    path: string,
+    alt = '',
+  ): { image: HTMLImageElement; cover: boolean } | undefined => {
     const source = imageDataUrl(path);
     if (!source) return undefined;
-    const figure = document.createElement('figure');
-    figure.className = 'book-image';
-    if (path === parsed.coverPath && !coverRendered) {
-      figure.classList.add('book-cover');
-      coverRendered = true;
-    }
     const image = document.createElement('img');
     image.src = source;
     image.alt = alt;
     image.loading = 'eager';
+    const cover = path === parsed.coverPath && !coverRendered;
+    if (cover) coverRendered = true;
+    return { image, cover };
+  };
+
+  const createImage = (path: string, alt = ''): HTMLElement | undefined => {
+    const rendered = createImageElement(path, alt);
+    if (!rendered) return undefined;
+    const figure = document.createElement('figure');
+    figure.className = 'book-image';
+    if (rendered.cover) figure.classList.add('book-cover');
+    const { image } = rendered;
     figure.append(image);
     addAnchor(figure);
     return figure;
@@ -395,10 +404,23 @@ export function renderEpub(parsed: ParsedEpub): RenderedBook {
           || source.getAttribute('href')
           || '';
         const path = resolveArchivePath(chapter.path, href);
-        const image = path ? createImage(path, source.getAttribute('alt') ?? '') : undefined;
+        const insideFigure = source.parentElement?.localName.toLocaleLowerCase() === 'figure';
+        const rendered = path ? createImageElement(path, source.getAttribute('alt') ?? '') : undefined;
         const targetInfo = targetsBySource.get(source);
-        if (image && targetInfo) image.id = targetInfo.id;
-        return image;
+        if (!rendered) return undefined;
+        if (rendered.cover) rendered.image.dataset.readerCover = '';
+        if (insideFigure) {
+          if (targetInfo) rendered.image.id = targetInfo.id;
+          return rendered.image;
+        }
+
+        const figure = document.createElement('figure');
+        figure.className = 'book-image';
+        if (rendered.cover) figure.classList.add('book-cover');
+        if (targetInfo) figure.id = targetInfo.id;
+        figure.append(rendered.image);
+        addAnchor(figure);
+        return figure;
       }
 
       let target: HTMLElement;
@@ -452,6 +474,14 @@ export function renderEpub(parsed: ParsedEpub): RenderedBook {
         for (const child of Array.from(source.childNodes)) {
           const rendered = renderNode(child);
           if (rendered) target.append(rendered);
+        }
+      }
+      if (name === 'figure' && target.querySelector(':scope > img')) {
+        target.classList.add('book-image');
+        const cover = target.querySelector<HTMLElement>(':scope > img[data-reader-cover]');
+        if (cover) {
+          target.classList.add('book-cover');
+          delete cover.dataset.readerCover;
         }
       }
       return target;

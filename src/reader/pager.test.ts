@@ -4,6 +4,7 @@ import { ReaderPager, type PagerSnapshot } from './pager';
 describe('ReaderPager', () => {
   let viewport: HTMLElement;
   let content: HTMLElement;
+  let motionCompanion: HTMLElement;
   let snapshots: PagerSnapshot[];
   let pager: ReaderPager;
   let animateDescriptor: PropertyDescriptor | undefined;
@@ -94,11 +95,13 @@ describe('ReaderPager', () => {
 
     viewport = document.createElement('div');
     content = document.createElement('article');
+    motionCompanion = document.createElement('div');
     viewport.append(content);
-    document.body.append(viewport);
+    document.body.append(viewport, motionCompanion);
     snapshots = [];
 
     Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 1000 });
+    Object.defineProperty(viewport, 'clientHeight', { configurable: true, value: 600 });
     Object.defineProperty(viewport, 'getBoundingClientRect', {
       configurable: true,
       value: () => ({
@@ -122,10 +125,16 @@ describe('ReaderPager', () => {
       }),
     });
 
-    pager = new ReaderPager(viewport, content, (snapshot) => snapshots.push(snapshot));
+    pager = new ReaderPager(
+      viewport,
+      content,
+      (snapshot) => snapshots.push(snapshot),
+      motionCompanion,
+    );
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     pager.destroy();
     Reflect.deleteProperty(document, 'startViewTransition');
     if (animateDescriptor) {
@@ -147,6 +156,7 @@ describe('ReaderPager', () => {
     });
     expect(content.style.getPropertyValue('--page-width')).toBe('434px');
     expect(content.style.getPropertyValue('--page-gap')).toBe('132px');
+    expect(content.style.getPropertyValue('--page-content-height')).toBe('600px');
 
     pager.next();
     expect(pager.getSnapshot().currentPage).toBe(3);
@@ -159,6 +169,48 @@ describe('ReaderPager', () => {
     pager.previous();
     expect(pager.getSnapshot().currentPage).toBe(3);
     expect(snapshots.length).toBeGreaterThan(3);
+  });
+
+  it('previews and commits an absolute page without changing the active page first', async () => {
+    await pager.setBook(document.createDocumentFragment());
+    const changesBeforePreview = snapshots.length;
+
+    const target = pager.skimTarget(4);
+
+    expect(target).toMatchObject({
+      currentPage: 3,
+      lastPage: 4,
+      totalPages: 5,
+      chunkIndex: 0,
+      chunkPage: 3,
+    });
+    expect(pager.getSnapshot().currentPage).toBe(1);
+    expect(snapshots).toHaveLength(changesBeforePreview);
+
+    expect(pager.commitSkim(target!)).toBe(true);
+    expect(pager.getSnapshot().currentPage).toBe(3);
+  });
+
+  it('renders a skim preview into a separate host without replacing the book', async () => {
+    const source = document.createDocumentFragment();
+    const paragraph = anchor('preview-anchor', 0, 80);
+    paragraph.textContent = 'Preview text';
+    source.append(paragraph);
+    await pager.setBook(source);
+    const target = pager.skimTarget(1)!;
+    const activeBook = content.querySelector('.book');
+    const changesBeforePreview = snapshots.length;
+    const host = document.createElement('div');
+    Object.defineProperty(host, 'clientWidth', { configurable: true, value: 250 });
+    document.body.append(host);
+
+    pager.renderSkimPreview(target, host);
+
+    expect(host.querySelector('.skim-preview-content')).not.toBeNull();
+    expect(host.textContent).toContain('Preview text');
+    expect(content.querySelector('.book')).toBe(activeBook);
+    expect(pager.getSnapshot().currentPage).toBe(1);
+    expect(snapshots).toHaveLength(changesBeforePreview);
   });
 
   it('accumulates rapid page turns without smooth-scroll restarts', async () => {
@@ -175,6 +227,52 @@ describe('ReaderPager', () => {
       .map(([options]) => options as ScrollToOptions);
     expect(scrollCalls.at(-1)).toMatchObject({ left: 4528, behavior: 'auto' });
     expect(scrollCalls.every((options) => options.behavior !== 'smooth')).toBe(true);
+  });
+
+  it('moves the full-screen page numbers with the same page-turn motion', async () => {
+    const contentAnimate = vi.fn(() => ({
+      cancel: vi.fn(),
+      finished: Promise.resolve(),
+    }) as unknown as Animation);
+    const companionAnimate = vi.fn(() => ({
+      cancel: vi.fn(),
+      finished: Promise.resolve(),
+    }) as unknown as Animation);
+    Object.defineProperty(content, 'animate', { configurable: true, value: contentAnimate });
+    Object.defineProperty(motionCompanion, 'animate', {
+      configurable: true,
+      value: companionAnimate,
+    });
+    await pager.setBook(document.createDocumentFragment());
+
+    pager.next();
+
+    expect(motionCompanion.style.getPropertyValue('--reader-page-turn-distance')).toBe('1132px');
+    expect(companionAnimate).toHaveBeenCalledTimes(1);
+    expect(companionAnimate.mock.calls[0]).toEqual(contentAnimate.mock.calls[0]);
+  });
+
+  it('does not animate the page numbers when reduced motion is requested', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    const contentAnimate = vi.fn(() => ({
+      cancel: vi.fn(),
+      finished: Promise.resolve(),
+    }) as unknown as Animation);
+    const companionAnimate = vi.fn(() => ({
+      cancel: vi.fn(),
+      finished: Promise.resolve(),
+    }) as unknown as Animation);
+    Object.defineProperty(content, 'animate', { configurable: true, value: contentAnimate });
+    Object.defineProperty(motionCompanion, 'animate', {
+      configurable: true,
+      value: companionAnimate,
+    });
+    await pager.setBook(document.createDocumentFragment());
+
+    pager.next();
+
+    expect(contentAnimate).not.toHaveBeenCalled();
+    expect(companionAnimate).not.toHaveBeenCalled();
   });
 
   it('stores the first anchor whose top-left corner is visible in the spread', async () => {
@@ -373,6 +471,71 @@ describe('ReaderPager', () => {
     expect(pager.getSnapshot()).toMatchObject({ chunkIndex: 0, anchor: 'first' });
   });
 
+  it('finishes exact pagination when Safari never runs requestIdleCallback', async () => {
+    vi.useFakeTimers();
+    const cancelIdleCallback = vi.fn();
+    vi.stubGlobal('requestIdleCallback', vi.fn(() => 41));
+    vi.stubGlobal('cancelIdleCallback', cancelIdleCallback);
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 434 });
+    const first = chunk(anchor('first', 0, 80));
+    const second = chunk(anchor('second', 0, 80));
+
+    await pager.setBook(chunkedBook(first, second));
+    expect(pager.getSnapshot().paginationExact).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(400);
+
+    expect(pager.getSnapshot().paginationExact).toBe(true);
+    expect(snapshots.at(-1)?.paginationExact).toBe(true);
+    expect(cancelIdleCallback).toHaveBeenCalledWith(41);
+  });
+
+  it('keeps the current pagination queue when Safari runs a cancelled idle callback late', async () => {
+    vi.useFakeTimers();
+    const idleCallbacks: Array<() => void> = [];
+    vi.stubGlobal('requestIdleCallback', vi.fn((callback: () => void) => {
+      idleCallbacks.push(callback);
+      return idleCallbacks.length;
+    }));
+    vi.stubGlobal('cancelIdleCallback', vi.fn());
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 434 });
+    const first = chunk(anchor('first', 0, 80));
+    const second = chunk(anchor('second', 0, 80));
+
+    await pager.setBook(chunkedBook(first, second));
+    pager.setFontSize(20);
+    await vi.advanceTimersByTimeAsync(20);
+    expect(idleCallbacks).toHaveLength(2);
+
+    idleCallbacks[0]!();
+    await vi.advanceTimersByTimeAsync(400);
+
+    expect(pager.getSnapshot().paginationExact).toBe(true);
+    expect(snapshots.at(-1)?.paginationExact).toBe(true);
+  });
+
+  it('measures several background chunks in each Safari layout pass', async () => {
+    const idleCallbacks: Array<() => void> = [];
+    vi.stubGlobal('requestIdleCallback', vi.fn((callback: () => void) => {
+      idleCallbacks.push(callback);
+      return idleCallbacks.length;
+    }));
+    vi.stubGlobal('cancelIdleCallback', vi.fn());
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 434 });
+    const chunks = Array.from({ length: 6 }, (_, index) => (
+      chunk(anchor(`chunk-${index}`, 0, 80))
+    ));
+
+    await pager.setBook(chunkedBook(...chunks));
+    expect(pager.getSnapshot().paginationExact).toBe(false);
+
+    idleCallbacks.shift()!();
+    expect(pager.getSnapshot().paginationExact).toBe(false);
+    idleCallbacks.shift()!();
+
+    expect(pager.getSnapshot().paginationExact).toBe(true);
+  });
+
   it('keeps rapid chapter turns on the latest requested destination', async () => {
     Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 434 });
     let firstUpdate: (() => void) | undefined;
@@ -467,9 +630,11 @@ describe('ReaderPager', () => {
 
     expect(pager.getSnapshot().currentPage).toBe(1);
     expect(content.style.transform).toBe('translateX(-80px)');
+    expect(motionCompanion.style.transform).toBe('translateX(-80px)');
     expect(pager.finishSwipe(1)).toBe(true);
     expect(pager.getSnapshot().currentPage).toBe(3);
     expect(content.style.transform).toBe('');
+    expect(motionCompanion.style.transform).toBe('');
 
     pager.beginSwipe();
     pager.updateSwipe(20);

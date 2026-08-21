@@ -68,6 +68,10 @@ function epub3Files(): Record<string, Uint8Array> {
           <p><a href="chapter2.xhtml#destination">Перейти дальше</a></p>
           <p><a href="javascript:alert(1)">Опасная ссылка</a></p>
           <img src="../Images/cover.png" alt="Обложка" onerror="evil()" />
+          <figure>
+            <img src="../Images/cover.png" alt="Иллюстрация с подписью" />
+            <figcaption>Подпись остаётся с изображением.</figcaption>
+          </figure>
           <img src="../Images/diagram.svg" alt="Диаграмма" />
           <img src="https://example.com/tracker.png" alt="Трекер" />
         </body>
@@ -168,6 +172,12 @@ describe('EPUB support', () => {
     expect(svgText).not.toContain('onload');
     expect(svgText).not.toContain('example.com');
     expect(book?.querySelector('img[alt="Трекер"]')).toBeNull();
+    const caption = Array.from(book?.querySelectorAll('figcaption') ?? [])
+      .find((element) => element.textContent === 'Подпись остаётся с изображением.');
+    const captionedFigure = caption?.closest('figure.book-image');
+    expect(captionedFigure?.querySelector(':scope > img')?.getAttribute('alt'))
+      .toBe('Иллюстрация с подписью');
+    expect(captionedFigure?.querySelector(':scope > .book-image')).toBeNull();
     expect(book?.querySelector('script, style, form, iframe')).toBeNull();
     expect(book?.querySelector('[onclick], [onerror], [style]')).toBeNull();
     expect(book?.textContent).not.toContain('globalThis.evil');

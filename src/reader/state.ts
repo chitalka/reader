@@ -79,6 +79,7 @@ export interface ReaderState {
   positions: Record<string, PositionRecord>;
   bookmarks: Record<string, BookmarkRecord>;
   quotes: Record<string, QuoteRecord>;
+  analyticsCleared?: VersionedValue<string | null>;
 }
 
 export interface SyncSnapshot {
@@ -103,6 +104,7 @@ export function createEmptyReaderState(deviceId = createDeviceId()): ReaderState
     positions: {},
     bookmarks: {},
     quotes: {},
+    analyticsCleared: undefined,
   };
 }
 
@@ -192,6 +194,7 @@ export function mergeReaderStates(first: ReaderState, second: ReaderState): Read
     positions: mergeVersionedMap(first.positions, second.positions),
     bookmarks: mergeVersionedMap(first.bookmarks, second.bookmarks),
     quotes: mergeVersionedMap(first.quotes, second.quotes),
+    analyticsCleared: latest(first.analyticsCleared, second.analyticsCleared),
   };
 }
 
