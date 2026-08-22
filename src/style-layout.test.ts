@@ -15,4 +15,10 @@ describe('reader layout styles', () => {
       'padding: clamp(34px, 5.5vh, 74px) clamp(28px, 7vw, 92px);',
     );
   });
+
+  it('keeps the fast progress visible while exact pagination is pending', () => {
+    expect(stylesheet).not.toContain('.progress-group.is-pending .progress-copy');
+    expect(stylesheet).not.toContain('.reader-footer.is-pending .fullscreen-reader-status');
+    expect(stylesheet).not.toContain('.pagination-placeholder');
+  });
 });

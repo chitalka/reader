@@ -66,7 +66,8 @@ const PAGE_TURN_DURATION = MOTION_DURATION.page;
 const PAGE_TURN_EASING = MOTION_EASING.move;
 const MEASUREMENT_DELAY_MS = 32;
 const IDLE_MEASUREMENT_WATCHDOG_MS = 300;
-const MEASUREMENT_BATCH_SIZE = 4;
+// One detached chapter per pass keeps WebKit's synchronous column layout bounded.
+const MEASUREMENT_BATCH_SIZE = 1;
 
 export class ReaderPager {
   private currentColumn = 0;
@@ -1113,7 +1114,13 @@ export class ReaderPager {
 
     const measureNext = (): void => {
       if (generation !== this.measurementGeneration || geometry.key !== this.layout?.key) return;
-      const chunkIndices = queue.splice(0, MEASUREMENT_BATCH_SIZE);
+      const chunkIndices: number[] = [];
+      while (queue.length && chunkIndices.length < MEASUREMENT_BATCH_SIZE) {
+        const chunkIndex = queue.shift();
+        if (chunkIndex !== undefined && !this.chunkPageCounts.has(chunkIndex)) {
+          chunkIndices.push(chunkIndex);
+        }
+      }
       if (!chunkIndices.length) {
         this.onChange(this.getSnapshot());
         return;

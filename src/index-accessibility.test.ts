@@ -62,6 +62,7 @@ describe('reader shell accessibility', () => {
     expect(fullscreenStatus?.querySelector('#fullscreen-page-track')).not.toBeNull();
     expect(fullscreenStatus?.querySelector('.fullscreen-page-spread')?.textContent?.trim())
       .toBe('1');
+    expect(markup.querySelector('#pagination-placeholder')).toBeNull();
   });
 
   it('publishes the author, license, year, and public release version in settings', () => {
@@ -77,7 +78,7 @@ describe('reader shell accessibility', () => {
     expect(author?.getAttribute('rel')).toBe('noopener noreferrer');
     expect(license?.textContent).toBe('MIT License');
     expect(projectInfo?.textContent?.replace(/\s+/gu, ' ').trim())
-      .toBe('© 2026 · Oleg Mokhov · MIT License · v.2.02.01');
+      .toBe('© 2026 · Oleg Mokhov · MIT License · v.2.02.02');
   });
 
   it('covers the unfinished reader with an accessible initial splash', () => {

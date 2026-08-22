@@ -191,7 +191,6 @@ export class ChitalkaApp {
   private readonly skimPage = requiredElement<HTMLElement>('skim-page');
   private readonly skimPreview = requiredElement<HTMLElement>('skim-preview');
   private readonly skimHint = requiredElement<HTMLElement>('skim-hint');
-  private readonly paginationPlaceholder = requiredElement<HTMLElement>('pagination-placeholder');
   private readonly fontDownButton = requiredElement<HTMLButtonElement>('font-down');
   private readonly fontUpButton = requiredElement<HTMLButtonElement>('font-up');
   private readonly fontSizeValue = requiredElement<HTMLOutputElement>('font-size-value');
@@ -681,22 +680,24 @@ export class ChitalkaApp {
     if (this.appRoot.dataset.pagesPerView !== pagesPerView) {
       this.appRoot.dataset.pagesPerView = pagesPerView;
     }
-    if (snapshot.paginationExact) {
-      if (this.progress.value !== snapshot.progress) this.progress.value = snapshot.progress;
-      const roundedProgress = Math.round(snapshot.progress);
-      const progressText = `${roundedProgress}%`;
-      if (this.progressPercent.textContent !== progressText) {
-        this.progressPercent.textContent = progressText;
-      }
-      if (this.fullscreenProgressPercent.textContent !== progressText) {
-        this.fullscreenProgressPercent.textContent = progressText;
-      }
-      if (this.progress.textContent !== progressText) this.progress.textContent = progressText;
-      this.updateTimeEstimate(snapshot.progress);
-      this.setPaginationPending(false);
-    } else {
-      this.setPaginationPending(true);
+
+    if (this.progress.value !== snapshot.progress) this.progress.value = snapshot.progress;
+    const roundedProgress = Math.round(snapshot.progress);
+    const progressText = `${roundedProgress}%`;
+    if (this.progressPercent.textContent !== progressText) {
+      this.progressPercent.textContent = progressText;
     }
+    if (this.fullscreenProgressPercent.textContent !== progressText) {
+      this.fullscreenProgressPercent.textContent = progressText;
+    }
+    if (this.progress.textContent !== progressText) this.progress.textContent = progressText;
+
+    if (snapshot.paginationExact) {
+      this.updateTimeEstimate(snapshot.progress);
+    } else {
+      this.setTimeEstimatePending();
+    }
+    this.setPaginationPending(!snapshot.paginationExact);
   }
 
   private renderFullscreenPages(snapshot: PagerSnapshot, motion?: PageTurnMotion): void {
@@ -759,12 +760,15 @@ export class ChitalkaApp {
       this.progressGroup.classList.contains('is-pending') === pending
       && this.readerFooter.classList.contains('is-pending') === pending
       && this.progressGroup.getAttribute('aria-busy') === value
-      && this.paginationPlaceholder.hidden === !pending
     ) return;
     this.progressGroup.classList.toggle('is-pending', pending);
     this.readerFooter.classList.toggle('is-pending', pending);
     this.progressGroup.setAttribute('aria-busy', value);
-    this.paginationPlaceholder.hidden = !pending;
+  }
+
+  private setTimeEstimatePending(): void {
+    if (this.timeLabel.textContent !== '…') this.timeLabel.textContent = '…';
+    if (this.compactTimeLabel.textContent !== '…') this.compactTimeLabel.textContent = '…';
   }
 
   private updateTimeEstimate(progress: number): void {

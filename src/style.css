@@ -1842,51 +1842,6 @@ button:disabled {
   min-width: 0;
 }
 
-.progress-group.is-pending .progress-copy,
-.progress-group.is-pending progress {
-  visibility: hidden;
-}
-
-.pagination-placeholder {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-  font-size: 16px;
-}
-
-.pagination-placeholder[hidden] {
-  display: none;
-}
-
-.pagination-placeholder-dots {
-  width: 3ch;
-  text-align: left;
-}
-
-.pagination-placeholder-dots::after {
-  content: ".";
-  animation: pagination-dots 1.2s step-end infinite;
-}
-
-@keyframes pagination-dots {
-  0%,
-  32% {
-    content: ".";
-  }
-
-  33%,
-  65% {
-    content: "..";
-  }
-
-  66%,
-  100% {
-    content: "...";
-  }
-}
-
 .progress-copy {
   display: flex;
   justify-content: space-between;
@@ -3043,8 +2998,7 @@ textarea {
 .reader-status,
 .back-to-text,
 .drop-overlay,
-.toast,
-.pagination-placeholder {
+.toast {
   font-family: var(--ui-font-family);
   font-weight: var(--ui-weight-regular);
   line-height: var(--ui-line-height);
@@ -3061,10 +3015,6 @@ textarea {
 .toast,
 .back-to-text {
   font-size: var(--ui-font-size);
-}
-
-.pagination-placeholder {
-  font-size: var(--ui-font-size-sm);
 }
 
 .paging-controls {
@@ -3791,16 +3741,14 @@ progress::-moz-progress-bar {
 
 .paging-controls,
 .progress-group,
-.fullscreen-reader-status,
-.pagination-placeholder {
+.fullscreen-reader-status {
   transition:
     transform var(--motion-routine) var(--ease-enter),
     opacity var(--motion-routine) var(--ease-enter);
 }
 
 #app[data-header-visibility="hidden"] .paging-controls,
-#app[data-header-visibility="hidden"] .progress-group,
-#app[data-header-visibility="hidden"] .pagination-placeholder {
+#app[data-header-visibility="hidden"] .progress-group {
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
@@ -3821,18 +3769,6 @@ progress::-moz-progress-bar {
 #app[data-header-visibility="hidden"][data-fullscreen-status="page"]
   .fullscreen-page-viewport {
   display: block;
-}
-
-#app[data-header-visibility="hidden"]
-  .reader-footer.is-pending .fullscreen-reader-status {
-  visibility: hidden;
-  opacity: 0;
-}
-
-#app[data-header-visibility="hidden"][data-fullscreen-status="page"]
-  .reader-footer.is-pending .fullscreen-reader-status {
-  visibility: visible;
-  opacity: 1;
 }
 
 @media (max-width: 520px) {
@@ -3863,14 +3799,12 @@ progress::-moz-progress-bar {
 @media (prefers-reduced-motion: reduce) {
   .paging-controls,
   .progress-group,
-  .fullscreen-reader-status,
-  .pagination-placeholder {
+  .fullscreen-reader-status {
     transition: opacity 120ms var(--ease-enter);
   }
 
   #app[data-header-visibility="hidden"] .paging-controls,
-  #app[data-header-visibility="hidden"] .progress-group,
-  #app[data-header-visibility="hidden"] .pagination-placeholder {
+  #app[data-header-visibility="hidden"] .progress-group {
     transform: none;
   }
 
@@ -4072,7 +4006,6 @@ progress::-moz-progress-bar {
 }
 
 .progress-copy,
-.pagination-placeholder,
 .reader-footer .page-button {
   font-family: var(--ui-font-family);
   font-size: var(--ui-font-size-sm);

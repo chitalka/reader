@@ -1,0 +1,10 @@
+Chitalka 2.02.02
+
+Large EPUB books now work more smoothly in Safari.
+
+The reading footer appears immediately with the current pages and reading percentage, while the exact page count and completion forecast continue calculating in the background.
+
+Background pagination is lighter and no longer measures completed chapters twice.
+
+Demo: https://chitalka.github.io/demo/
+Full notes: https://github.com/chitalka/reader/releases/tag/v2.02.02

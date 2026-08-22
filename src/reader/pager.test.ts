@@ -579,7 +579,7 @@ describe('ReaderPager', () => {
     expect(snapshots.at(-1)?.paginationExact).toBe(true);
   });
 
-  it('measures several background chunks in each Safari layout pass', async () => {
+  it('measures one background chunk in each Safari layout pass', async () => {
     const idleCallbacks: Array<() => void> = [];
     vi.stubGlobal('requestIdleCallback', vi.fn((callback: () => void) => {
       idleCallbacks.push(callback);
@@ -594,8 +594,31 @@ describe('ReaderPager', () => {
     await pager.setBook(chunkedBook(...chunks));
     expect(pager.getSnapshot().paginationExact).toBe(false);
 
+    for (let index = 0; index < 4; index += 1) {
+      idleCallbacks.shift()!();
+      expect(pager.getSnapshot().paginationExact).toBe(false);
+    }
     idleCallbacks.shift()!();
-    expect(pager.getSnapshot().paginationExact).toBe(false);
+
+    expect(pager.getSnapshot().paginationExact).toBe(true);
+  });
+
+  it('does not remeasure a background chunk that was opened while pagination was pending', async () => {
+    const idleCallbacks: Array<() => void> = [];
+    vi.stubGlobal('requestIdleCallback', vi.fn((callback: () => void) => {
+      idleCallbacks.push(callback);
+      return idleCallbacks.length;
+    }));
+    vi.stubGlobal('cancelIdleCallback', vi.fn());
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 434 });
+    const first = chunk(anchor('first', 0, 80));
+    const second = chunk(anchor('second', 0, 80));
+    const third = chunk(anchor('third', 0, 80));
+
+    await pager.setBook(chunkedBook(first, second, third));
+    pager.next();
+    expect(pager.getSnapshot()).toMatchObject({ chunkIndex: 1, paginationExact: false });
+
     idleCallbacks.shift()!();
 
     expect(pager.getSnapshot().paginationExact).toBe(true);

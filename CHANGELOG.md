@@ -2,6 +2,19 @@
 
 All notable public changes to Chitalka are documented in this file.
 
+## [2.02.02] - 2026-08-22
+
+### Changed
+
+- EPUB pagination no longer blocks the reading footer: the current pages and reading percentage appear immediately, while the exact total and completion forecast continue calculating in the background.
+- Background pagination now processes one chapter at a time to reduce layout stalls in Safari.
+- Chapters already measured during reading are skipped by the background pagination queue.
+
+### Fixed
+
+- Fixed the footer remaining stuck in the page-counting state on large EPUB books.
+- Fixed full-screen page and percentage indicators disappearing while exact pagination was still in progress.
+
 ## [2.02.01] - 2026-08-21
 
 ### Fixed
@@ -64,6 +77,7 @@ All notable public changes to Chitalka are documented in this file.
 - Included optional synchronization through private application folders in Google Drive and Yandex Disk.
 - Published the installable PWA demo at <https://chitalka.github.io/demo/>.
 
+[2.02.02]: https://github.com/chitalka/reader/releases/tag/v2.02.02
 [2.02.01]: https://github.com/chitalka/reader/releases/tag/v2.02.01
 [2.02]: https://github.com/chitalka/reader/releases/tag/v2.02
 [2.01]: https://github.com/chitalka/reader/releases/tag/v2.01
