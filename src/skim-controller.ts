@@ -13,7 +13,7 @@ export interface SkimElements {
 
 export interface SkimActions {
   chapterForAnchor(anchor: string | undefined): string;
-  committed(): void;
+  committed(origin: PagerSnapshot, target: SkimTarget): void;
 }
 
 type SkimMode = 'idle' | 'hover' | 'drag' | 'keyboard';
@@ -159,12 +159,17 @@ export class SkimController {
 
   private commit(): void {
     const target = this.target;
-    if (!target || !this.pager.commitSkim(target)) {
+    if (!target) {
+      this.cancel();
+      return;
+    }
+    const origin = this.pager.getSnapshot();
+    if (!this.pager.commitSkim(target)) {
       this.cancel();
       return;
     }
     this.cancel();
-    this.actions.committed();
+    this.actions.committed(origin, target);
   }
 
   private readonly handlePointerEnter = (event: PointerEvent): void => {
@@ -173,7 +178,11 @@ export class SkimController {
   };
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
-    if (this.elements.input.disabled || event.pointerType === 'touch') return;
+    if (this.elements.input.disabled) return;
+    if (event.pointerType === 'touch') {
+      if (this.mode !== 'drag' || this.pointerId !== event.pointerId) return;
+      event.preventDefault();
+    }
     if (this.mode === 'drag' && this.pointerId !== event.pointerId) return;
     this.previewPage(this.pageFromPointer(event), this.mode === 'drag' ? 'drag' : 'hover');
   };

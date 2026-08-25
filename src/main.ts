@@ -2,6 +2,7 @@ import { ChitalkaApp } from './app';
 import { registerServiceWorker } from './pwa';
 import { dismissInitialSplash } from './splash';
 import './style.css';
+import './design-system.css';
 
 registerServiceWorker();
 

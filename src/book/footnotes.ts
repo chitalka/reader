@@ -7,7 +7,10 @@ export function inlineFootnoteText(referenceText: string, noteText: string): str
   const text = noteText.trim();
   if (!reference) return text;
 
-  const repeatedReference = new RegExp(`^${escapeRegExp(reference)}(?:[.\\s]+|$)`, 'u');
+  const repeatedReference = new RegExp(
+    `^${escapeRegExp(reference)}(?:[.\\s]+|(?=\\p{L})|$)`,
+    'u',
+  );
   const body = text.replace(repeatedReference, '').trim();
   return body ? `${reference}. ${body}` : `${reference}.`;
 }

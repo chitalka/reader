@@ -749,4 +749,27 @@ describe('ReaderPager', () => {
     expect(text.isConnected).toBe(true);
     expect(notes.isConnected).toBe(false);
   });
+
+  it('restores a saved reading position after a preview jump', async () => {
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 2170 });
+    const fragment = document.createDocumentFragment();
+    fragment.append(anchor('reading-place', 2, 80));
+    await pager.setBook(fragment, { chunk: 0, chunkColumn: 2 });
+    const origin = pager.getSnapshot();
+
+    const destination = pager.skimTarget(5);
+    expect(destination).toBeDefined();
+    expect(pager.commitSkim(destination!)).toBe(true);
+    expect(pager.getSnapshot().currentPage).toBe(5);
+
+    expect(pager.goToPosition({
+      anchor: origin.anchor,
+      chunk: origin.chunkIndex,
+      chunkColumn: origin.chunkPage - 1,
+    })).toBe(true);
+    expect(pager.getSnapshot()).toMatchObject({
+      currentPage: origin.currentPage,
+      anchor: origin.anchor,
+    });
+  });
 });

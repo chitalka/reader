@@ -78,7 +78,23 @@ describe('reader shell accessibility', () => {
     expect(author?.getAttribute('rel')).toBe('noopener noreferrer');
     expect(license?.textContent).toBe('MIT License');
     expect(projectInfo?.textContent?.replace(/\s+/gu, ' ').trim())
-      .toBe('© 2026 · Oleg Mokhov · MIT License · v.2.02.02');
+      .toBe('© 2026 · Oleg Mokhov · MIT License · v.2.03');
+  });
+
+  it('provides localized About content and both public update channels', () => {
+    const about = markup.querySelector<HTMLElement>('#settings-about-view');
+    const englishTelegram = about?.querySelector<HTMLAnchorElement>('.about-telegram--en');
+    const russianTelegram = about?.querySelector<HTMLAnchorElement>('.about-telegram--ru');
+    const source = about?.querySelector<HTMLAnchorElement>('a[href="https://github.com/chitalka/reader"]');
+
+    expect(about?.querySelector('#about-app-title')?.textContent).toBe('Chitalka');
+    expect(about?.textContent).toContain('The best reader for reading “War and Peace”');
+    expect(englishTelegram?.getAttribute('href')).toBe('https://t.me/chitalka_reader');
+    expect(russianTelegram?.getAttribute('href')).toBe('https://t.me/chitalka_reader_ru');
+    expect(source?.textContent).toBe('GitHub');
+    expect([englishTelegram, russianTelegram, source].every((link) => (
+      link?.getAttribute('rel') === 'noopener noreferrer'
+    ))).toBe(true);
   });
 
   it('covers the unfinished reader with an accessible initial splash', () => {

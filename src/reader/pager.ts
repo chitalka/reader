@@ -319,6 +319,19 @@ export class ReaderPager {
     return true;
   }
 
+  goToPosition(position: RestorePosition): boolean {
+    if (!this.bookRoot || !this.navigationChunks.length) return false;
+    const chunkIndex = this.restoreChunk(position);
+    if (!this.navigationChunks.includes(chunkIndex)) return false;
+    this.cancelNavigationAnimations();
+    this.activeAnchor = position.anchor;
+    if (chunkIndex !== this.currentChunkIndex) this.mountChunk(chunkIndex);
+    this.performLayout({ ...position, chunk: chunkIndex });
+    this.captureVisibleAnchor();
+    this.moveToCurrent(false);
+    return true;
+  }
+
   goToTextOffset(anchor: string, offset: number, preserveTarget = false): boolean {
     const element = this.anchorElements.get(anchor);
     const chunkIndex = this.anchorChunks.get(anchor);

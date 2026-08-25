@@ -122,9 +122,16 @@ export interface TouchSwipeHandlers {
 
 interface TouchSwipeSession extends TouchPoint {
   active: boolean;
+  footnoteLink?: HTMLAnchorElement;
   lastTime: number;
   lastVelocity: number;
   lastX: number;
+}
+
+function swipeFootnoteLink(target: EventTarget | null): HTMLAnchorElement | undefined {
+  return target instanceof Element
+    ? target.closest<HTMLAnchorElement>('a.footnote-link') ?? undefined
+    : undefined;
 }
 
 export function swipeTurnDirection(
@@ -150,6 +157,20 @@ export function bindTouchSwipe(
   handlers: TouchSwipeHandlers,
 ): () => void {
   let session: TouchSwipeSession | undefined;
+  let suppressedClickTarget: HTMLAnchorElement | undefined;
+  let suppressedClickTimer: number | undefined;
+
+  const clearSuppressedClick = (): void => {
+    if (suppressedClickTimer !== undefined) window.clearTimeout(suppressedClickTimer);
+    suppressedClickTimer = undefined;
+    suppressedClickTarget = undefined;
+  };
+
+  const suppressFootnoteClick = (link: HTMLAnchorElement): void => {
+    clearSuppressedClick();
+    suppressedClickTarget = link;
+    suppressedClickTimer = window.setTimeout(clearSuppressedClick, 400);
+  };
 
   const release = (pointerId: number): void => {
     if (typeof target.hasPointerCapture === 'function' && target.hasPointerCapture(pointerId)) {
@@ -177,10 +198,11 @@ export function bindTouchSwipe(
   };
 
   const handlePointerDown = (event: PointerEvent) => {
+    const footnoteLink = swipeFootnoteLink(event.target);
     if (
       !event.isPrimary
       || event.pointerType === 'mouse'
-      || isToggleBlockedTarget(event.target)
+      || (isToggleBlockedTarget(event.target) && !footnoteLink)
       || hasTextSelection(target.ownerDocument)
     ) return;
     session = {
@@ -188,6 +210,7 @@ export function bindTouchSwipe(
       x: event.clientX,
       y: event.clientY,
       active: false,
+      footnoteLink,
       lastTime: event.timeStamp,
       lastVelocity: 0,
       lastX: event.clientX,
@@ -211,15 +234,29 @@ export function bindTouchSwipe(
     const distance = event.clientX - session.x;
     if (!session.active) activate(event);
     if (session?.active) {
+      event.preventDefault();
       const elapsed = event.timeStamp - session.lastTime;
       const velocity = elapsed > 0
         ? (event.clientX - session.lastX) / elapsed
         : session.lastVelocity;
       handlers.move(distance);
       handlers.end({ distance, velocity });
+      if (session.footnoteLink) suppressFootnoteClick(session.footnoteLink);
     }
     release(event.pointerId);
     session = undefined;
+  };
+
+  const handleClick = (event: MouseEvent): void => {
+    const clickTarget = event.target;
+    if (
+      !suppressedClickTarget
+      || !(clickTarget instanceof Node)
+      || !suppressedClickTarget.contains(clickTarget)
+    ) return;
+    event.preventDefault();
+    event.stopPropagation();
+    clearSuppressedClick();
   };
 
   const handlePointerCancel = (event: PointerEvent) => {
@@ -233,12 +270,15 @@ export function bindTouchSwipe(
   target.addEventListener('pointermove', handlePointerMove);
   target.addEventListener('pointerup', handlePointerUp);
   target.addEventListener('pointercancel', handlePointerCancel);
+  target.addEventListener('click', handleClick, true);
 
   return () => {
     target.removeEventListener('pointerdown', handlePointerDown);
     target.removeEventListener('pointermove', handlePointerMove);
     target.removeEventListener('pointerup', handlePointerUp);
     target.removeEventListener('pointercancel', handlePointerCancel);
+    target.removeEventListener('click', handleClick, true);
+    clearSuppressedClick();
     if (session?.active) handlers.cancel();
     if (session) release(session.pointerId);
     session = undefined;

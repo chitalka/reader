@@ -107,6 +107,13 @@ const DIRECT_ELEMENTS = new Set([
 const NOTE_TOKENS = new Set(['doc-endnote', 'doc-footnote', 'endnote', 'footnote', 'note', 'rearnote']);
 const NOTE_REF_TOKENS = new Set(['doc-noteref', 'noteref']);
 const NOTE_CONTAINER_TOKENS = new Set(['endnotes', 'footnotes', 'notes', 'rearnotes']);
+const NOTE_DOCUMENT_TITLES = new Set([
+  'endnotes',
+  'footnotes',
+  'notes',
+  'примечания',
+  'сноски',
+]);
 const POEM_TOKENS = new Set(['poem', 'verse']);
 
 interface PreparedDocument {
@@ -163,7 +170,14 @@ function isNoteElement(element: Element): boolean {
 
 function documentContainsNotes(body: Element): boolean {
   if (hasToken(body, NOTE_CONTAINER_TOKENS)) return true;
-  return Array.from(body.children).some((child) => hasToken(child, NOTE_CONTAINER_TOKENS));
+  if (Array.from(body.children).some((child) => hasToken(child, NOTE_CONTAINER_TOKENS))) return true;
+
+  const heading = Array.from(body.querySelectorAll('h1, h2, h3, h4, h5, h6, p'))
+    .map((element) => normalizedText(element))
+    .find(Boolean)
+    ?.replace(/[.:]+$/gu, '')
+    .toLocaleLowerCase();
+  return Boolean(heading && NOTE_DOCUMENT_TITLES.has(heading));
 }
 
 function base64(bytes: Uint8Array): string {
@@ -273,7 +287,7 @@ export function renderEpub(parsed: ParsedEpub): RenderedBook {
       if (!originalId) continue;
       const info: TargetInfo = {
         id: `epub-target-${index}-${targetCounter++}`,
-        note: isNoteElement(element),
+        note: chapter.notes || isNoteElement(element),
         source: element,
         text: normalizedText(element),
       };

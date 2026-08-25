@@ -1,0 +1,955 @@
+/* CH-77: one visual language for reader chrome, overlays, and settings. */
+:root {
+  --bg: #f4f2ee;
+  --surface: rgb(255 255 255 / 0.94);
+  --surface-solid: #fbfaf8;
+  --surface-raised: #ffffff;
+  --surface-control: #f2f0f3;
+  --field-bg: #f8f7f9;
+  --text: #27252a;
+  --muted: #6c6872;
+  --line: #d8d4dc;
+  --border-subtle: #d8d4dc;
+  --border-strong: #8b4de8;
+  --accent: #8b4de8;
+  --accent-strong: #6425bd;
+  --accent-fill-hover: #7c3fd5;
+  --accent-soft: #efe8fa;
+  --active-fill: #eee6fa;
+  --active-text: #6425bd;
+  --control-hover-bg: #f1eafb;
+  --control-hover-border: #b18ae8;
+  --control-active-bg: #8b4de8;
+  --control-active-border: #8b4de8;
+  --control-active-text: #ffffff;
+  --focus: #8b4de8;
+  --shadow: 0 14px 38px rgb(42 31 55 / 0.14);
+  --popover-shadow: 0 18px 52px rgb(34 25 45 / 0.2);
+  --radius-control: 6px;
+  --radius-popover: 10px;
+  --ui-font-size: 13px;
+  --ui-font-size-sm: 12px;
+  --ui-title-size: 15px;
+  --ui-control-size: 34px;
+  --ui-radius: var(--radius-control);
+  --ui-popup-radius: var(--radius-popover);
+  --ui-popup-padding: 16px;
+  --motion-immediate: 140ms;
+  --motion-exit: 160ms;
+  --motion-routine: 180ms;
+  --motion-sheet: 360ms;
+  --motion-preview: 125ms;
+  --ease-enter: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:root[data-theme="dark"] {
+  --bg: #151617;
+  --surface: rgb(29 30 32 / 0.96);
+  --surface-solid: #1c1d1f;
+  --surface-raised: #1d1e20;
+  --surface-control: #242528;
+  --field-bg: #202124;
+  --text: #eeeaf2;
+  --muted: #a9a4af;
+  --line: #424047;
+  --border-subtle: #454249;
+  --border-strong: #9a65e8;
+  --accent: #9a59ed;
+  --accent-strong: #d9c4fa;
+  --accent-fill-hover: #8846db;
+  --accent-soft: #30243e;
+  --active-fill: #302440;
+  --active-text: #dfccfb;
+  --control-hover-bg: #2b2434;
+  --control-hover-border: #78599e;
+  --control-active-bg: #914ee5;
+  --control-active-border: #a86df0;
+  --control-active-text: #ffffff;
+  --focus: #bd8cff;
+  --shadow: 0 16px 42px rgb(0 0 0 / 0.34);
+  --popover-shadow: 0 22px 58px rgb(0 0 0 / 0.48);
+}
+
+body,
+button,
+input,
+select,
+textarea,
+.toc-panel,
+.annotations-panel,
+.settings-panel,
+.quote-menu,
+.reader-footer {
+  font-family: var(--font-interface);
+}
+
+button,
+.open-button,
+select,
+textarea {
+  font-size: var(--ui-font-size);
+}
+
+button:focus-visible,
+#book-file:focus-visible + .open-button,
+.language-select:focus-within,
+.setting-option input:focus-visible + span,
+.analytics-switch input:focus-visible + .analytics-switch-track,
+.annotation-color:focus-visible,
+.book-scrubber:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.icon-button,
+.open-button,
+.page-button,
+.settings-close,
+.panel-close,
+.quote-menu-close {
+  width: var(--ui-control-size);
+  height: var(--ui-control-size);
+  min-width: var(--ui-control-size);
+  flex-basis: var(--ui-control-size);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface-raised) 68%, transparent);
+  box-shadow: none;
+  transition:
+    color var(--motion-immediate) ease,
+    border-color var(--motion-immediate) ease,
+    background-color var(--motion-immediate) ease,
+    transform var(--motion-immediate) var(--ease-enter);
+}
+
+.icon-button[aria-expanded="true"] {
+  border-color: var(--control-active-border);
+  color: var(--control-active-text);
+  background: var(--control-active-bg);
+}
+
+.icon-button:active,
+.open-button:active,
+.page-button:active:not(:disabled),
+.settings-close:active,
+.panel-close:active,
+.quote-menu-close:active,
+.settings-back:active,
+.annotation-primary-action:active,
+.annotation-save:active,
+.annotation-editor-actions button:active,
+.analytics-clear-dialog button:active,
+.sync-provider button:active,
+.sync-summary button:active {
+  transform: scale(0.97);
+}
+
+.settings-icon,
+.toc-icon,
+.bookmark-icon,
+.upload-icon,
+.close-icon,
+.page-icon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.65;
+}
+
+.header-actions {
+  gap: 6px;
+}
+
+.header-actions .open-button {
+  width: var(--ui-control-size);
+  height: var(--ui-control-size);
+  margin-left: 0;
+  border: 1px solid var(--border-subtle);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface-raised) 68%, transparent);
+}
+
+.book-viewport {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.reader-footer {
+  min-height: 62px;
+  padding-top: 4px;
+  padding-bottom: 10px;
+  color: var(--muted);
+  font-size: var(--ui-font-size-sm);
+}
+
+.paging-controls {
+  gap: 6px;
+}
+
+.page-button {
+  font-size: var(--ui-font-size);
+}
+
+.progress-copy {
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: var(--ui-font-size-sm);
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+.progress-group progress,
+.skim-track::after {
+  height: 3px;
+}
+
+.toc-panel,
+.annotations-panel,
+.quote-menu {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-popover);
+  color: var(--text);
+  background: var(--surface-raised);
+  box-shadow: var(--popover-shadow);
+  font-size: var(--ui-font-size);
+  line-height: 1.4;
+  transition:
+    opacity 180ms var(--ease-enter),
+    transform 180ms var(--ease-enter);
+}
+
+.toc-panel,
+.annotations-panel {
+  gap: 12px;
+  padding: var(--ui-popup-padding);
+}
+
+.toc-panel {
+  width: min(320px, calc(100vw - 32px));
+  --motion-closed-transform: translateY(-4px) scale(0.97);
+}
+
+.annotations-panel {
+  width: min(400px, calc(100vw - 32px));
+  --motion-closed-transform: translateY(-4px) scale(0.97);
+}
+
+.quote-menu {
+  width: min(330px, calc(100vw - 24px));
+  gap: 13px;
+  padding: var(--ui-popup-padding);
+  --motion-closed-transform: translateY(4px) scale(0.97);
+}
+
+.toc-panel-header,
+.annotations-panel-header,
+.quote-menu-header {
+  min-height: var(--ui-control-size);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.toc-panel h2,
+.annotations-panel h2,
+.quote-menu h2,
+.annotation-editor h3 {
+  margin: 0;
+  font-family: var(--font-interface);
+  font-size: var(--ui-title-size);
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.3;
+}
+
+.toc-panel .panel-close,
+.annotations-panel .panel-close,
+.quote-menu-close {
+  border-color: transparent;
+  color: var(--muted);
+  background: transparent;
+}
+
+.toc-link,
+.toc-label {
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.toc-link[aria-current="location"] {
+  border-color: transparent;
+  color: var(--active-text);
+  background: var(--active-fill);
+  font-weight: 600;
+}
+
+.annotation-tabs {
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+}
+
+.annotation-tabs button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: var(--ui-font-size);
+  font-weight: 500;
+}
+
+.annotation-tabs button::after {
+  transition: background-color 180ms var(--ease-move);
+}
+
+.annotation-tabs button[aria-selected="true"] {
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  box-shadow: none;
+}
+
+.annotation-primary-action,
+.annotation-save,
+.sync-provider button,
+.sync-summary button {
+  min-height: 34px;
+  border: 1px solid var(--control-active-border);
+  border-radius: var(--radius-control);
+  color: var(--control-active-text);
+  background: var(--control-active-bg);
+  box-shadow: none;
+  font-size: var(--ui-font-size);
+  font-weight: 600;
+}
+
+.annotation-card {
+  grid-template-columns: 2px minmax(0, 1fr) 28px;
+  gap: 9px;
+  min-height: 58px;
+  padding: 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: transparent;
+}
+
+.annotation-card-main,
+.annotation-card-main strong,
+.annotation-card-main span,
+.annotation-card-edit {
+  font-family: var(--font-interface);
+}
+
+.annotation-card-main strong {
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.annotation-card-main span {
+  margin-top: 5px;
+  font-size: var(--ui-font-size-sm);
+  line-height: 1.3;
+}
+
+.annotation-card-edit {
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+}
+
+.annotation-editor {
+  gap: 14px;
+  padding: var(--ui-popup-padding);
+  border-radius: inherit;
+  background: var(--surface-raised);
+  font-family: var(--font-interface);
+  transition:
+    opacity 180ms var(--ease-enter),
+    transform 180ms var(--ease-enter);
+}
+
+.annotation-editor label,
+.quote-menu label {
+  gap: 7px;
+  color: var(--text);
+  font-size: var(--ui-font-size-sm);
+  font-weight: 500;
+}
+
+.annotation-editor textarea,
+.quote-menu textarea {
+  min-height: 76px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  color: var(--text);
+  background: var(--field-bg);
+  font-size: var(--ui-font-size);
+  line-height: 1.45;
+}
+
+.annotation-editor-actions button,
+.quote-menu-actions .annotation-delete {
+  min-height: 34px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  color: var(--text);
+  background: transparent;
+  font-size: var(--ui-font-size);
+}
+
+.annotation-editor-actions .annotation-save,
+.quote-menu-actions .annotation-save {
+  border-color: var(--control-active-border);
+  color: var(--control-active-text);
+  background: var(--control-active-bg);
+}
+
+.annotation-color {
+  width: 24px;
+  height: 24px;
+  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+  border-radius: 4px;
+  transition:
+    border-color var(--motion-immediate) ease,
+    transform var(--motion-immediate) var(--ease-enter);
+}
+
+#settings-panel.settings-panel {
+  font-size: var(--ui-font-size);
+  line-height: 1.45;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 180ms var(--ease-enter),
+    transform 180ms var(--ease-enter);
+  --motion-closed-transform: translateY(8px);
+}
+
+#settings-panel.settings-panel[data-motion-state="opening"],
+#settings-panel.settings-panel[data-motion-state="closing"] {
+  opacity: 0;
+  transform: var(--motion-closed-transform);
+}
+
+#settings-panel .settings-panel-header {
+  grid-template-columns: 220px minmax(0, 760px);
+  min-height: 68px;
+  border-bottom-color: var(--border-subtle);
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+}
+
+#settings-panel .settings-panel-header h2 {
+  padding-inline: 44px;
+  font-family: var(--font-interface);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.settings-back {
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--text);
+  background: transparent;
+  font-size: var(--ui-font-size);
+  transition:
+    color var(--motion-immediate) ease,
+    border-color var(--motion-immediate) ease,
+    background-color var(--motion-immediate) ease,
+    transform var(--motion-immediate) var(--ease-enter);
+}
+
+.settings-layout {
+  grid-template-columns: 220px minmax(0, 760px);
+  min-height: calc(100% - 68px);
+}
+
+.settings-navigation {
+  gap: 5px;
+  padding: 34px 26px 40px 0;
+}
+
+.settings-navigation button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--text);
+  background: transparent;
+  font-size: var(--ui-font-size);
+  font-weight: 500;
+  transition:
+    color var(--motion-immediate) ease,
+    border-color var(--motion-immediate) ease,
+    background-color var(--motion-immediate) ease,
+    transform var(--motion-immediate) var(--ease-enter);
+}
+
+.settings-navigation button[aria-current="page"] {
+  border-color: transparent;
+  color: var(--active-text);
+  background: var(--active-fill);
+  font-weight: 600;
+}
+
+.settings-content {
+  padding: 40px 44px 64px;
+}
+
+.settings-view {
+  width: min(100%, 680px);
+}
+
+#settings-reading-view {
+  width: min(100%, 440px);
+  gap: 26px;
+}
+
+#settings-reading-view > .settings-group {
+  gap: 8px;
+}
+
+#settings-panel .settings-group legend {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--ui-font-size-sm);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+#settings-panel .font-size-control,
+#settings-panel .segmented-control {
+  min-height: 34px;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--field-bg);
+}
+
+#settings-panel .font-size-control {
+  grid-template-columns: 42px minmax(64px, 1fr) 42px;
+}
+
+#settings-panel .setting-step,
+#settings-panel .setting-option span {
+  min-height: 34px;
+  border: 0;
+  border-right: 1px solid var(--border-subtle);
+  border-radius: 0;
+  color: var(--text);
+  background: transparent;
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+}
+
+#settings-panel .setting-step:last-child,
+#settings-panel .setting-option:last-child span {
+  border-right: 0;
+}
+
+#settings-panel .setting-step:first-child {
+  border-left: 0;
+}
+
+#settings-panel .font-size-control output {
+  height: 34px;
+  border: 0;
+  border-right: 1px solid var(--border-subtle);
+  border-radius: 0;
+  color: var(--text);
+  background: transparent;
+  font-size: var(--ui-font-size);
+  font-weight: 500;
+}
+
+#settings-panel .setting-option input:checked + span {
+  border-color: transparent;
+  color: var(--active-text);
+  background: var(--active-fill);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent);
+  font-weight: 600;
+}
+
+#settings-panel .settings-language-group .language-select,
+#settings-panel .settings-language-group .language-select select {
+  width: 100%;
+  height: 36px;
+}
+
+#settings-panel .settings-language-group .language-select select {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  color: var(--text);
+  background: var(--field-bg);
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+}
+
+.analytics-heading {
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.analytics-heading h3,
+#settings-sync-view .sync-settings > legend,
+.about-app h3 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-family: var(--font-interface);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.analytics-heading p,
+.about-app > p {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.analytics-switch {
+  min-height: 48px;
+  border-color: var(--border-subtle);
+}
+
+.analytics-switch-track {
+  transition:
+    background-color var(--motion-immediate) ease,
+    border-color var(--motion-immediate) ease;
+}
+
+.analytics-switch-track::after {
+  transition: transform var(--motion-immediate) var(--ease-enter);
+}
+
+.analytics-dashboard {
+  gap: 42px;
+}
+
+.analytics-summary {
+  gap: 24px;
+  padding-block: 20px;
+}
+
+.analytics-insights {
+  gap: 42px;
+}
+
+.analytics-insights section + section {
+  padding-left: 42px;
+}
+
+#settings-sync-view .sync-help {
+  gap: 10px 28px;
+  margin-bottom: 32px;
+}
+
+#settings-sync-view .sync-provider {
+  min-height: 62px;
+}
+
+.about-app {
+  display: grid;
+  gap: 14px;
+  max-width: 560px;
+}
+
+.about-app-links {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.about-app-links p {
+  margin: 0;
+}
+
+.about-app a,
+.settings-project-info a {
+  color: var(--accent-strong);
+  text-decoration-color: color-mix(in srgb, currentColor 48%, transparent);
+  text-underline-offset: 3px;
+}
+
+:root[data-language="en"] .about-telegram--ru,
+:root[data-language="ru"] .about-telegram--en {
+  display: none;
+}
+
+.settings-project-info--page {
+  margin-top: 36px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--muted);
+  font-size: var(--ui-font-size-sm);
+}
+
+.skim-popover:not([hidden]) {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  transform-origin: 50% 100%;
+  transition:
+    opacity var(--motion-preview) var(--ease-enter),
+    transform var(--motion-preview) var(--ease-enter);
+
+  @starting-style {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.97);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .icon-button:hover:not([aria-expanded="true"]),
+  .open-button:hover,
+  .page-button:hover:not(:disabled),
+  .settings-close:hover,
+  .panel-close:hover,
+  .quote-menu-close:hover,
+  .settings-back:hover,
+  .settings-navigation button:hover:not([aria-current="page"]),
+  .annotation-card-edit:hover,
+  .annotation-editor-actions button:hover,
+  .quote-menu-actions .annotation-delete:hover {
+    border-color: var(--control-hover-border);
+    color: var(--accent-strong);
+    background: var(--control-hover-bg);
+  }
+
+  .toc-link:hover:not([aria-current="location"]),
+  .annotation-tabs button:hover,
+  #settings-panel .setting-step:hover:not(:disabled),
+  #settings-panel .setting-option:hover span,
+  .annotation-card:hover {
+    color: var(--accent-strong);
+    background: color-mix(in srgb, var(--control-hover-bg) 68%, transparent);
+  }
+
+  .annotation-primary-action:hover,
+  .annotation-save:hover,
+  .sync-provider button:hover:not(:disabled),
+  .sync-summary button:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--control-active-border) 82%, white);
+    background: var(--accent-fill-hover);
+  }
+
+  .annotation-color:hover {
+    border-color: var(--text);
+    transform: translateY(-1px);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .icon-button:hover:not([aria-expanded="true"]),
+  .open-button:hover,
+  .page-button:hover:not(:disabled),
+  .settings-close:hover,
+  .panel-close:hover,
+  .quote-menu-close:hover {
+    border-color: var(--border-subtle);
+    color: var(--muted);
+    background: color-mix(in srgb, var(--surface-raised) 68%, transparent);
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --ui-control-size: 40px;
+  }
+
+  .reader-footer {
+    min-height: 66px;
+  }
+
+  #settings-panel .settings-panel-header {
+    min-height: 64px;
+  }
+
+  .settings-navigation {
+    top: 64px;
+    grid-template-columns: repeat(4, max-content);
+    gap: 6px;
+    padding: 10px 16px;
+  }
+
+  .settings-navigation button {
+    min-height: 40px;
+  }
+
+  .settings-content {
+    padding: 30px 20px max(56px, env(safe-area-inset-bottom));
+  }
+
+  #settings-reading-view {
+    width: 100%;
+    gap: 28px;
+  }
+
+  #settings-panel .font-size-control,
+  #settings-panel .segmented-control,
+  #settings-panel .setting-step,
+  #settings-panel .setting-option span {
+    min-height: 40px;
+  }
+
+  #settings-panel .font-size-control output {
+    height: 40px;
+  }
+}
+
+@media (max-width: 640px) {
+  .progress-copy {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    column-gap: 12px;
+    font-size: 10px;
+  }
+
+  .progress-copy #progress-percent {
+    justify-self: start;
+  }
+
+  .progress-copy #page-label {
+    justify-self: center;
+  }
+
+  .progress-copy #time-label-compact {
+    justify-self: end;
+  }
+
+  #toc-panel,
+  #annotations-panel {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: min(82dvh, 680px);
+    padding: 18px max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 16px 16px 0 0;
+    --motion-closed-transform: translateY(100%);
+    transition:
+      opacity var(--motion-sheet) var(--ease-drawer),
+      transform var(--motion-sheet) var(--ease-drawer);
+  }
+
+  .quote-menu {
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    top: auto !important;
+    width: 100%;
+    padding: 18px max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 16px 16px 0 0;
+    --motion-closed-transform: translateY(100%);
+    transition:
+      opacity var(--motion-sheet) var(--ease-drawer),
+      transform var(--motion-sheet) var(--ease-drawer);
+  }
+
+  .toc-link,
+  .toc-label,
+  .annotation-tabs button,
+  .annotation-primary-action,
+  .annotation-card-main,
+  .annotation-card-edit,
+  .annotation-editor-actions button,
+  .quote-menu-actions button {
+    min-height: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-button,
+  .open-button,
+  .page-button,
+  .settings-close,
+  .panel-close,
+  .quote-menu-close,
+  .settings-back,
+  .settings-navigation button,
+  .toc-panel,
+  .annotations-panel,
+  .quote-menu,
+  .annotation-editor,
+  #settings-panel.settings-panel,
+  .skim-popover {
+    transition-duration: 120ms;
+    transition-property: opacity, color, border-color, background-color;
+  }
+
+  .toc-panel[data-motion-state="opening"],
+  .toc-panel[data-motion-state="closing"],
+  .annotations-panel[data-motion-state="opening"],
+  .annotations-panel[data-motion-state="closing"],
+  .quote-menu[data-motion-state="opening"],
+  .quote-menu[data-motion-state="closing"],
+  .annotation-editor[data-motion-state="opening"],
+  .annotation-editor[data-motion-state="closing"],
+  #settings-panel.settings-panel[data-motion-state="opening"],
+  #settings-panel.settings-panel[data-motion-state="closing"] {
+    transform: none;
+  }
+
+  .skim-popover:not([hidden]) {
+    transform: translateX(-50%);
+  }
+}
+
+/* Reader chrome is frameless; popup and settings controls keep their borders. */
+.app-header .icon-button,
+.header-actions .open-button,
+.reader-footer .page-button {
+  border-color: transparent;
+  background: transparent;
+}
+
+.app-header .icon-button[aria-expanded="true"] {
+  border-color: transparent;
+  background: var(--control-active-bg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .app-header .icon-button:hover:not([aria-expanded="true"]),
+  .header-actions .open-button:hover,
+  .reader-footer .page-button:hover:not(:disabled) {
+    border-color: transparent;
+    color: var(--accent-strong);
+    background: var(--control-hover-bg);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .app-header .icon-button:hover:not([aria-expanded="true"]),
+  .header-actions .open-button:hover,
+  .reader-footer .page-button:hover:not(:disabled) {
+    border-color: transparent;
+    background: transparent;
+  }
+}

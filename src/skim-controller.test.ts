@@ -34,7 +34,7 @@ describe('SkimController', () => {
   let elements: SkimElements;
   let pager: ReaderPager;
   let commitSkim: ReturnType<typeof vi.fn>;
-  let committed: ReturnType<typeof vi.fn<() => void>>;
+  let committed: ReturnType<typeof vi.fn<(origin: PagerSnapshot, target: SkimTarget) => void>>;
   let controller: SkimController;
 
   beforeEach(() => {
@@ -70,9 +70,10 @@ describe('SkimController', () => {
         host.textContent = 'preview';
         return 'chapter';
       }),
+      getSnapshot: vi.fn(() => snapshot()),
       commitSkim,
     } as unknown as ReaderPager;
-    committed = vi.fn<() => void>();
+    committed = vi.fn<(origin: PagerSnapshot, target: SkimTarget) => void>();
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);
       return 1;
@@ -109,7 +110,10 @@ describe('SkimController', () => {
     elements.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
     expect(commitSkim).toHaveBeenCalledWith(expect.objectContaining({ currentPage: 67 }));
-    expect(committed).toHaveBeenCalledOnce();
+    expect(committed).toHaveBeenCalledWith(
+      expect.objectContaining({ currentPage: 12 }),
+      expect.objectContaining({ currentPage: 67 }),
+    );
   });
 
   it('moves keyboard previews by a whole spread in two-page mode', () => {
@@ -158,14 +162,19 @@ describe('SkimController', () => {
   });
 
   it('commits a pointer drag on release and cancels an interrupted drag', () => {
-    const pointer = (type: string, clientX: number, pointerId: number): Event => {
-      const event = new Event(type, { bubbles: true });
+    const pointer = (
+      type: string,
+      clientX: number,
+      pointerId: number,
+      pointerType = 'mouse',
+    ): Event => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
       Object.assign(event, {
         button: 0,
         clientX,
         isPrimary: true,
         pointerId,
-        pointerType: 'mouse',
+        pointerType,
       });
       return event;
     };
@@ -184,5 +193,34 @@ describe('SkimController', () => {
 
     expect(commitSkim).not.toHaveBeenCalled();
     expect(elements.input.value).toBe('12');
+  });
+
+  it('tracks a touch drag, commits it on release, and preserves the origin', () => {
+    const pointer = (type: string, clientX: number): Event => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.assign(event, {
+        button: 0,
+        clientX,
+        isPrimary: true,
+        pointerId: 9,
+        pointerType: 'touch',
+      });
+      return event;
+    };
+
+    elements.input.dispatchEvent(pointer('pointerdown', 30));
+    elements.input.dispatchEvent(pointer('pointermove', 76));
+
+    expect(elements.popover.hidden).toBe(false);
+    expect(elements.input.value).toBe('76');
+    expect(commitSkim).not.toHaveBeenCalled();
+
+    elements.input.dispatchEvent(pointer('pointerup', 76));
+
+    expect(commitSkim).toHaveBeenCalledWith(expect.objectContaining({ currentPage: 76 }));
+    expect(committed).toHaveBeenCalledWith(
+      expect.objectContaining({ currentPage: 12, chunkIndex: 0, chunkPage: 12 }),
+      expect.objectContaining({ currentPage: 76 }),
+    );
   });
 });

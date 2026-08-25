@@ -97,6 +97,23 @@ function epub3Files(): Record<string, Uint8Array> {
   };
 }
 
+function legacyFootnoteFiles(): Record<string, Uint8Array> {
+  const files = epub3Files();
+  files['OEBPS/Text/chapter1.xhtml'] = xml(`<?xml version="1.0"?>
+    <html xmlns="http://www.w3.org/1999/xhtml"><body>
+      <h1>Глава</h1>
+      <p>Основной текст <a class="a" href="notes.xhtml#note-1">[1]</a>.</p>
+      <p id="same-document-target">Обычная цель.</p>
+      <p><a href="#same-document-target">Обычная внутренняя ссылка</a></p>
+    </body></html>`);
+  files['OEBPS/Text/notes.xhtml'] = xml(`<?xml version="1.0"?>
+    <html xmlns="http://www.w3.org/1999/xhtml"><body class="z">
+      <div class="title"><p>Примечания</p></div>
+      <span id="note-1"><div><p>1</p></div><p>Текст старой EPUB-сноски.</p></span>
+    </body></html>`);
+  return files;
+}
+
 function minimalArchive(packageDocument: string, additions: Record<string, Uint8Array> = {}) {
   return {
     'META-INF/container.xml': xml(`<?xml version="1.0"?>
@@ -205,6 +222,25 @@ describe('EPUB support', () => {
     expect(rendered.toc[0]?.children.every((item) => (
       Boolean(item.target && book?.querySelector(`[data-reader-anchor="${item.target}"]`))
     ))).toBe(true);
+  });
+
+  it('recognizes an unmarked EPUB 2 notes document and keeps ordinary links ordinary', () => {
+    const rendered = renderEpub(parseEpubArchive(legacyFootnoteFiles()));
+    const book = rendered.fragment.querySelector<HTMLElement>('.book');
+    const footnote = Array.from(book?.querySelectorAll<HTMLAnchorElement>('a') ?? [])
+      .find((link) => link.textContent === '[1]');
+    const ordinary = Array.from(book?.querySelectorAll<HTMLAnchorElement>('a') ?? [])
+      .find((link) => link.textContent === 'Обычная внутренняя ссылка');
+    const target = footnote?.hash
+      ? book?.querySelector<HTMLElement>(footnote.hash)
+      : undefined;
+
+    expect(footnote?.classList.contains('footnote-link')).toBe(true);
+    expect(footnote?.dataset.noteText).toBe('1. Текст старой EPUB-сноски.');
+    expect(target?.classList.contains('book-footnote')).toBe(true);
+    expect(target?.closest('[data-reader-notes]')).not.toBeNull();
+    expect(ordinary?.classList.contains('book-internal-link')).toBe(true);
+    expect(ordinary?.classList.contains('footnote-link')).toBe(false);
   });
 
   it('reads an EPUB 2 package with an NCX manifest item', () => {

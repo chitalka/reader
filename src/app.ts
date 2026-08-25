@@ -18,6 +18,7 @@ import {
   type PagerSnapshot,
   type PageMode,
   type PageTurnMotion,
+  type RestorePosition,
 } from './reader/pager';
 import { formatPageLabel } from './reader/page-label';
 import { SkimController } from './skim-controller';
@@ -149,7 +150,8 @@ export class ChitalkaApp {
   private analyticsHistoryExpanded = false;
   private currentTocTargets: string[] = [];
   private currentTocLabels = new Map<string, string>();
-  private backAnchor?: string;
+  private backPosition?: RestorePosition;
+  private backSwipeEnabled = false;
   private isPreparing = true;
   private dragDepth = 0;
   private savePositionTimer?: number;
@@ -350,9 +352,11 @@ export class ChitalkaApp {
       this.pager,
       {
         chapterForAnchor: (anchor) => this.skimChapterForAnchor(anchor),
-        committed: () => {
-          this.clearFootnoteReturn();
-          this.headerVisibility.hide();
+        committed: (origin, target) => {
+          if (
+            origin.chunkIndex !== target.chunkIndex
+            || origin.chunkPage !== target.chunkPage
+          ) this.setReturnPosition(origin, false);
         },
       },
     );
@@ -438,7 +442,7 @@ export class ChitalkaApp {
         if (input.checked) this.setFootnoteMode(input.value as FootnoteMode);
       });
     }
-    this.backButton.addEventListener('click', () => this.returnFromFootnote());
+    this.backButton.addEventListener('click', () => this.returnToPreviousPosition());
     this.languageSelect.addEventListener('change', () => {
       this.setInterfaceLanguage(normalizeLanguage(this.languageSelect.value));
     });
@@ -495,12 +499,12 @@ export class ChitalkaApp {
           this.pager.cancelSwipe();
           return;
         }
-        if (direction < 0 && this.backAnchor) {
+        if (direction < 0 && this.backPosition && this.backSwipeEnabled) {
           this.pager.cancelSwipe();
           this.navigateBackward();
           return;
         }
-        if (this.pager.finishSwipe(direction)) this.headerVisibility.hide();
+        this.pager.finishSwipe(direction);
       },
       cancel: () => this.pager.cancelSwipe(),
     });
@@ -558,7 +562,8 @@ export class ChitalkaApp {
     this.currentTocTargets = tocTargets(rendered.toc);
     this.currentTocLabels = tocPathLabels(rendered.toc);
     this.tocPanelController.setItems(rendered.toc);
-    this.backAnchor = undefined;
+    this.backPosition = undefined;
+    this.backSwipeEnabled = false;
     this.backButton.hidden = true;
     this.title.textContent = rendered.metadata.title;
     this.author.textContent = rendered.metadata.authors.join(', ');
@@ -1029,7 +1034,7 @@ export class ChitalkaApp {
   private setFootnoteMode(mode: FootnoteMode): void {
     if (mode === this.settings.footnoteMode) return;
     this.settings.footnoteMode = mode;
-    if (mode === 'inline') this.clearFootnoteReturn();
+    if (mode === 'inline') this.clearReturnPosition();
     this.content.querySelector<HTMLElement>('.book')
       ?.setAttribute('data-footnotes', this.settings.footnoteMode);
     this.saveSettings('footnoteMode');
@@ -1139,18 +1144,27 @@ export class ChitalkaApp {
     const footnote = link.classList.contains('footnote-link');
     if (footnote && this.settings.footnoteMode === 'inline') return;
     const id = decodeURIComponent(link.hash.slice(1));
-    const returnAnchor = footnote ? this.pager.getSnapshot().anchor : undefined;
+    const returnPosition = footnote ? this.pager.getSnapshot() : undefined;
     if (!this.pager.goToId(id)) return;
-    this.backAnchor = returnAnchor;
-    this.backButton.hidden = !footnote || !this.backAnchor;
+    if (returnPosition) this.setReturnPosition(returnPosition, true);
   }
 
-  private returnFromFootnote(): boolean {
-    if (!this.backAnchor) return false;
-    const returned = this.pager.goToAnchor(this.backAnchor);
+  private returnToPreviousPosition(): boolean {
+    if (!this.backPosition) return false;
+    const returned = this.pager.goToPosition(this.backPosition);
     if (!returned) return false;
-    this.clearFootnoteReturn();
+    this.clearReturnPosition();
     return true;
+  }
+
+  private setReturnPosition(snapshot: PagerSnapshot, backSwipeEnabled: boolean): void {
+    this.backPosition = {
+      anchor: snapshot.anchor,
+      chunk: snapshot.chunkIndex,
+      chunkColumn: Math.max(0, snapshot.chunkPage - 1),
+    };
+    this.backSwipeEnabled = backSwipeEnabled;
+    this.backButton.hidden = false;
   }
 
   private handleKeydown(event: KeyboardEvent): void {
@@ -1174,12 +1188,12 @@ export class ChitalkaApp {
         event.preventDefault();
         break;
       case 'Home':
-        this.clearFootnoteReturn();
+        this.clearReturnPosition();
         this.navigate(() => this.pager.first());
         event.preventDefault();
         break;
       case 'End':
-        this.clearFootnoteReturn();
+        this.clearReturnPosition();
         this.navigate(() => this.pager.last());
         event.preventDefault();
         break;
@@ -1198,21 +1212,20 @@ export class ChitalkaApp {
 
   private navigate(action: () => void): void {
     action();
-    this.headerVisibility.hide();
   }
 
   private navigateBackward(): void {
-    if (!this.returnFromFootnote()) this.pager.previous();
-    this.headerVisibility.hide();
+    if (!this.returnToPreviousPosition()) this.pager.previous();
   }
 
   private goToTocTarget(target: string): void {
-    this.clearFootnoteReturn();
+    this.clearReturnPosition();
     this.pager.goToAnchor(target, true);
   }
 
-  private clearFootnoteReturn(): void {
-    this.backAnchor = undefined;
+  private clearReturnPosition(): void {
+    this.backPosition = undefined;
+    this.backSwipeEnabled = false;
     this.backButton.hidden = true;
   }
 

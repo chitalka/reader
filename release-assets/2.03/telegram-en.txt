@@ -1,0 +1,9 @@
+Chitalka 2.03
+
+• Fixed page previews in mobile Safari and added a Back button
+• Older EPUB 2 books now identify notes sections more reliably
+• Restored returning to the footnote call site and back-swipe navigation in “Footnotes at the end” mode
+• Fixed notes failing to appear inline in “Footnotes inline” mode
+
+Demo: https://chitalka.github.io/demo/
+Full notes: https://github.com/chitalka/reader/releases/tag/v2.03

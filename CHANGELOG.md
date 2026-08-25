@@ -2,6 +2,15 @@
 
 All notable public changes to Chitalka are documented in this file.
 
+## [2.03] - 2026-08-25
+
+### Fixed
+
+- Fixed page previews in mobile Safari and added a **Back** button after navigation.
+- Older EPUB 2 books now identify notes sections more reliably.
+- Restored returning to the footnote call site and back-swipe navigation in **Footnotes at the end** mode.
+- Fixed notes failing to appear inline in **Footnotes inline** mode.
+
 ## [2.02.02] - 2026-08-22
 
 ### Changed
@@ -77,6 +86,7 @@ All notable public changes to Chitalka are documented in this file.
 - Included optional synchronization through private application folders in Google Drive and Yandex Disk.
 - Published the installable PWA demo at <https://chitalka.github.io/demo/>.
 
+[2.03]: https://github.com/chitalka/reader/releases/tag/v2.03
 [2.02.02]: https://github.com/chitalka/reader/releases/tag/v2.02.02
 [2.02.01]: https://github.com/chitalka/reader/releases/tag/v2.02.01
 [2.02]: https://github.com/chitalka/reader/releases/tag/v2.02

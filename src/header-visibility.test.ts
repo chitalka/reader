@@ -418,6 +418,43 @@ describe('bindTouchSwipe', () => {
     unbind();
   });
 
+  it('keeps a footnote tap native but turns a horizontal footnote swipe into paging', () => {
+    const reader = document.createElement('main');
+    const link = document.createElement('a');
+    link.className = 'footnote-link';
+    link.href = '#note-1';
+    link.textContent = '1';
+    reader.append(link);
+    document.body.append(reader);
+    const handlers = {
+      start: vi.fn(), move: vi.fn(), end: vi.fn(), cancel: vi.fn(),
+    };
+    const linkClick = vi.fn();
+    link.addEventListener('click', linkClick);
+    const unbind = bindTouchSwipe(reader, handlers);
+
+    dispatchPointer(link, 'pointerdown', { clientX: 100, timeStamp: 0 });
+    dispatchPointer(link, 'pointerup', { clientX: 101, timeStamp: 40 });
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    expect(handlers.start).not.toHaveBeenCalled();
+    expect(linkClick).toHaveBeenCalledTimes(1);
+
+    dispatchPointer(link, 'pointerdown', { clientX: 100, timeStamp: 100 });
+    dispatchPointer(link, 'pointermove', { clientX: 60, timeStamp: 150 });
+    dispatchPointer(link, 'pointerup', { clientX: 30, timeStamp: 200 });
+    const compatibilityClick = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link.dispatchEvent(compatibilityClick);
+
+    expect(handlers.start).toHaveBeenCalledTimes(1);
+    expect(handlers.end).toHaveBeenCalledWith({ distance: -70, velocity: -0.6 });
+    expect(compatibilityClick.defaultPrevented).toBe(true);
+    expect(linkClick).toHaveBeenCalledTimes(1);
+
+    unbind();
+    reader.remove();
+  });
+
   it('settles from distance or velocity and cancels a short slow drag', () => {
     expect(swipeTurnDirection({ distance: -80, velocity: -0.1 }, 390)).toBe(1);
     expect(swipeTurnDirection({ distance: 20, velocity: 0.5 }, 390)).toBe(-1);

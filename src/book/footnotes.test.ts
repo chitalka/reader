@@ -9,6 +9,8 @@ describe('inlineFootnoteText', () => {
 
   it('does not duplicate an existing reference number', () => {
     expect(inlineFootnoteText('[12]', '12. Текст сноски.')).toBe('12. Текст сноски.');
+    expect(inlineFootnoteText('[1]', '1Текст сноски без пробела.'))
+      .toBe('1. Текст сноски без пробела.');
   });
 
   it('preserves note text when a reference label is unavailable', () => {
