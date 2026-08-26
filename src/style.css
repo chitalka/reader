@@ -1762,6 +1762,7 @@ button:disabled {
   cursor: text;
 }
 
+.book[data-footnotes="inline"] .footnote-link > .footnote-reference,
 .book[data-footnotes="inline"] .footnote-link > sup {
   display: none;
 }
@@ -3244,6 +3245,8 @@ progress::-moz-progress-bar {
   appearance: none;
   background: transparent;
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .book-scrubber:focus {
@@ -3336,6 +3339,8 @@ progress::-moz-progress-bar {
   color: var(--text);
   font-family: var(--ui-font-family);
   pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .skim-popover[hidden] {

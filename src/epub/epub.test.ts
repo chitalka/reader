@@ -237,6 +237,7 @@ describe('EPUB support', () => {
 
     expect(footnote?.classList.contains('footnote-link')).toBe(true);
     expect(footnote?.dataset.noteText).toBe('1. Текст старой EPUB-сноски.');
+    expect(footnote?.querySelector(':scope > .footnote-reference')?.textContent).toBe('[1]');
     expect(target?.classList.contains('book-footnote')).toBe(true);
     expect(target?.closest('[data-reader-notes]')).not.toBeNull();
     expect(ordinary?.classList.contains('book-internal-link')).toBe(true);

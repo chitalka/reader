@@ -2,6 +2,15 @@
 
 All notable public changes to Chitalka are documented in this file.
 
+## [2.03.01] - 2026-08-26
+
+### Fixed
+
+- Fixed duplicated reference numbers in inline EPUB footnotes.
+- Added a subtle pulse to the remaining-time ellipsis while pagination is in progress.
+- Removed the desktop `Esc` instruction from touch page-preview hints.
+- Prevented accidental text selection while dragging page previews in mobile Safari.
+
 ## [2.03] - 2026-08-25
 
 ### Fixed
@@ -86,6 +95,7 @@ All notable public changes to Chitalka are documented in this file.
 - Included optional synchronization through private application folders in Google Drive and Yandex Disk.
 - Published the installable PWA demo at <https://chitalka.github.io/demo/>.
 
+[2.03.01]: https://github.com/chitalka/reader/releases/tag/v2.03.01
 [2.03]: https://github.com/chitalka/reader/releases/tag/v2.03
 [2.02.02]: https://github.com/chitalka/reader/releases/tag/v2.02.02
 [2.02.01]: https://github.com/chitalka/reader/releases/tag/v2.02.01

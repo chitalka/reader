@@ -490,6 +490,12 @@ export function renderEpub(parsed: ParsedEpub): RenderedBook {
           if (rendered) target.append(rendered);
         }
       }
+      if (target.classList.contains('footnote-link') && target.childNodes.length) {
+        const reference = document.createElement('span');
+        reference.className = 'footnote-reference';
+        reference.append(...Array.from(target.childNodes));
+        target.append(reference);
+      }
       if (name === 'figure' && target.querySelector(':scope > img')) {
         target.classList.add('book-image');
         const cover = target.querySelector<HTMLElement>(':scope > img[data-reader-cover]');

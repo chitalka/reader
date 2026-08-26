@@ -207,6 +207,22 @@ a:focus-visible {
   height: 3px;
 }
 
+@keyframes reader-pending-ellipsis {
+  0%,
+  100% {
+    opacity: 0.42;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.reader-footer.is-pending #time-label,
+.reader-footer.is-pending #time-label-compact {
+  animation: reader-pending-ellipsis 1200ms var(--ease-move) infinite;
+}
+
 .toc-panel,
 .annotations-panel,
 .quote-menu {
@@ -886,6 +902,12 @@ a:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .reader-footer.is-pending #time-label,
+  .reader-footer.is-pending #time-label-compact {
+    animation: none;
+    opacity: 0.72;
+  }
+
   .icon-button,
   .open-button,
   .page-button,

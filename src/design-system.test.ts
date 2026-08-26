@@ -34,6 +34,16 @@ describe('unified reader design system', () => {
     expect(stylesheet).toContain('transition-duration: 120ms;');
   });
 
+  it('pulses only the pending time ellipsis and respects reduced motion', () => {
+    expect(stylesheet).toContain('@keyframes reader-pending-ellipsis');
+    expect(stylesheet).toContain(
+      'animation: reader-pending-ellipsis 1200ms var(--ease-move) infinite;',
+    );
+    expect(stylesheet).toContain(
+      '.reader-footer.is-pending #time-label,\n  .reader-footer.is-pending #time-label-compact {\n    animation: none;',
+    );
+  });
+
   it('gates hover styling and presents mobile overlays as sheets', () => {
     expect(stylesheet).toContain('@media (hover: hover) and (pointer: fine)');
     expect(stylesheet).toContain('--motion-closed-transform: translateY(100%);');

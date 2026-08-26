@@ -180,6 +180,7 @@ describe('SkimController', () => {
     };
 
     elements.input.dispatchEvent(pointer('pointerdown', 40, 3));
+    expect(elements.hint.textContent).toContain('Esc');
     elements.input.dispatchEvent(pointer('pointermove', 70, 3));
     expect(commitSkim).not.toHaveBeenCalled();
     elements.input.dispatchEvent(pointer('pointerup', 70, 3));
@@ -208,11 +209,17 @@ describe('SkimController', () => {
       return event;
     };
 
-    elements.input.dispatchEvent(pointer('pointerdown', 30));
-    elements.input.dispatchEvent(pointer('pointermove', 76));
+    const pointerDown = pointer('pointerdown', 30);
+    const pointerMove = pointer('pointermove', 76);
+    elements.input.dispatchEvent(pointerDown);
+    elements.input.dispatchEvent(pointerMove);
 
     expect(elements.popover.hidden).toBe(false);
     expect(elements.input.value).toBe('76');
+    expect(elements.hint.textContent).toBe('Release to go');
+    expect(elements.hint.textContent).not.toContain('Esc');
+    expect(pointerDown.defaultPrevented).toBe(true);
+    expect(pointerMove.defaultPrevented).toBe(true);
     expect(commitSkim).not.toHaveBeenCalled();
 
     elements.input.dispatchEvent(pointer('pointerup', 76));

@@ -23,6 +23,7 @@ export class SkimController {
   private committedPage = 1;
   private target?: SkimTarget;
   private pointerId?: number;
+  private pointerType?: string;
   private renderFrame?: number;
 
   constructor(
@@ -80,6 +81,7 @@ export class SkimController {
   cancel(): void {
     this.mode = 'idle';
     this.pointerId = undefined;
+    this.pointerType = undefined;
     this.target = undefined;
     this.cancelRender();
     this.resetInput();
@@ -120,7 +122,9 @@ export class SkimController {
     this.elements.popover.hidden = false;
     this.elements.hint.textContent = mode === 'keyboard'
       ? t('reader.skimKeyboardHint')
-      : mode === 'drag' ? t('reader.skimPointerHint') : '';
+      : mode === 'drag'
+        ? t(this.pointerType === 'touch' ? 'reader.skimTouchHint' : 'reader.skimPointerHint')
+        : '';
     this.positionPopover(target.currentPage);
     this.scheduleRender(target);
   }
@@ -193,7 +197,9 @@ export class SkimController {
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
     if (this.elements.input.disabled || !event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    if (event.pointerType === 'touch') event.preventDefault();
     this.pointerId = event.pointerId;
+    this.pointerType = event.pointerType;
     this.elements.input.setPointerCapture?.(event.pointerId);
     this.previewPage(this.pageFromPointer(event), 'drag');
   };

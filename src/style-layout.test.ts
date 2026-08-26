@@ -21,4 +21,15 @@ describe('reader layout styles', () => {
     expect(stylesheet).not.toContain('.reader-footer.is-pending .fullscreen-reader-status');
     expect(stylesheet).not.toContain('.pagination-placeholder');
   });
+
+  it('hides the preserved EPUB reference only in inline mode', () => {
+    expect(stylesheet).toContain(
+      '.book[data-footnotes="inline"] .footnote-link > .footnote-reference,',
+    );
+  });
+
+  it('prevents Safari selection only on the preview controls', () => {
+    expect(stylesheet).toMatch(/\.book-scrubber \{[\s\S]*?-webkit-user-select: none;[\s\S]*?user-select: none;/u);
+    expect(stylesheet).toMatch(/\.skim-popover \{[\s\S]*?-webkit-user-select: none;[\s\S]*?user-select: none;/u);
+  });
 });
