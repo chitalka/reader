@@ -594,6 +594,8 @@ export class ChitalkaApp {
     this.status.hidden = true;
     this.reader.hidden = false;
     this.reader.classList.remove('is-preparing');
+    // Mobile WebKit can leave multicolumn measurements pending when they began under visibility:hidden.
+    this.pager.repaginate();
     this.dropZone.setAttribute('aria-busy', 'false');
     this.onPageChanged(this.pager.getSnapshot());
     this.headerVisibility.reveal();

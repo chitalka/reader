@@ -555,6 +555,34 @@ describe('ReaderPager', () => {
     expect(cancelIdleCallback).toHaveBeenCalledWith(41);
   });
 
+  it('restarts pagination after a book measured while hidden becomes visible', async () => {
+    vi.useFakeTimers();
+    const idleCallbacks: Array<() => void> = [];
+    const cancelIdleCallback = vi.fn();
+    vi.stubGlobal('requestIdleCallback', vi.fn((callback: () => void) => {
+      idleCallbacks.push(callback);
+      return idleCallbacks.length;
+    }));
+    vi.stubGlobal('cancelIdleCallback', cancelIdleCallback);
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 434 });
+
+    await pager.setBook(chunkedBook(
+      chunk(anchor('first', 0, 80)),
+      chunk(anchor('second', 0, 80)),
+      chunk(anchor('third', 0, 80)),
+    ));
+    const staleCallback = idleCallbacks[0]!;
+    expect(pager.getSnapshot().paginationExact).toBe(false);
+
+    pager.repaginate();
+    staleCallback();
+    await vi.advanceTimersByTimeAsync(400);
+
+    expect(cancelIdleCallback).toHaveBeenCalledWith(1);
+    expect(pager.getSnapshot().paginationExact).toBe(true);
+    expect(snapshots.at(-1)?.paginationExact).toBe(true);
+  });
+
   it('keeps the current pagination queue when Safari runs a cancelled idle callback late', async () => {
     vi.useFakeTimers();
     const idleCallbacks: Array<() => void> = [];

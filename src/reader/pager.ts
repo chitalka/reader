@@ -211,6 +211,15 @@ export class ReaderPager {
     this.scheduleLayout();
   }
 
+  repaginate(): void {
+    if (!this.bookRoot || !this.chunks.length) return;
+    this.cancelMeasurements();
+    if (this.layout) this.layoutPageCountCache.delete(this.layout.key);
+    this.chunkPageCounts.clear();
+    this.layout = undefined;
+    this.scheduleLayout();
+  }
+
   next(): void {
     this.requestStep(1);
   }
