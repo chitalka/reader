@@ -2,6 +2,16 @@
 
 All notable public changes to Chitalka are documented in this file.
 
+## [2.04] - 2026-09-03
+
+### Added
+
+- The left side of the reading footer now shows how many pages remain in the current chapter instead of the book percentage.
+
+### Fixed
+
+- Fixed unstable EPUB page counts in Safari: pagination now starts after the book becomes visible, and browser chrome no longer changes the total page count.
+
 ## [2.03.01] - 2026-08-26
 
 ### Fixed
@@ -95,6 +105,7 @@ All notable public changes to Chitalka are documented in this file.
 - Included optional synchronization through private application folders in Google Drive and Yandex Disk.
 - Published the installable PWA demo at <https://chitalka.github.io/demo/>.
 
+[2.04]: https://github.com/chitalka/reader/releases/tag/v2.04
 [2.03.01]: https://github.com/chitalka/reader/releases/tag/v2.03.01
 [2.03]: https://github.com/chitalka/reader/releases/tag/v2.03
 [2.02.02]: https://github.com/chitalka/reader/releases/tag/v2.02.02

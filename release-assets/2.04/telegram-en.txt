@@ -1,0 +1,8 @@
+Chitalka 2.04
+
+• Fixed unstable EPUB page counts in Safari: pagination now starts after the book becomes visible, and browser chrome no longer changes the total page count.
+
+• The left side of the reading footer now shows how many pages remain in the current chapter instead of the book percentage.
+
+Demo: https://chitalka.github.io/demo/
+Full notes: https://github.com/chitalka/reader/releases/tag/v2.04
