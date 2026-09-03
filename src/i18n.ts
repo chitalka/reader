@@ -134,6 +134,8 @@ const english = {
   'reader.currentPages': 'Pages {first}–{last}',
   'reader.page': 'Page {current} of {total}',
   'reader.pages': 'Pages {first}–{last} of {total}',
+  'reader.chapterPagesLeft': '{pages} {pageUnit} left in chapter',
+  'reader.chapterPagesPending': 'Pages left in chapter…',
   'reader.lessThanMinute': 'Less than a minute left',
   'reader.minutesLeft': 'About {minutes} min left',
   'reader.hoursLeft': 'About {hours} hr {minutes} min left',
@@ -354,6 +356,8 @@ const russian: Record<TranslationKey, string> = {
   'reader.currentPages': 'Страницы {first}–{last}',
   'reader.page': 'Страница {current} из {total}',
   'reader.pages': 'Страницы {first}–{last} из {total}',
+  'reader.chapterPagesLeft': 'До конца главы {pages} {pageUnit}',
+  'reader.chapterPagesPending': 'До конца главы …',
   'reader.lessThanMinute': 'До конца меньше минуты',
   'reader.minutesLeft': 'До конца около {minutes} мин',
   'reader.hoursLeft': 'До конца около {hours} ч {minutes} мин',
@@ -478,6 +482,16 @@ function russianUnit(value: number, one: string, few: string, many: string): str
   const last = value % 10;
   if (last === 1) return one;
   return last >= 2 && last <= 4 ? few : many;
+}
+
+export function formatChapterPagesLeft(pages: number): string {
+  const value = Math.max(1, Math.round(pages));
+  return t('reader.chapterPagesLeft', {
+    pages: value,
+    pageUnit: currentLanguage === 'ru'
+      ? russianUnit(value, 'страница', 'страницы', 'страниц')
+      : value === 1 ? 'page' : 'pages',
+  });
 }
 
 export function formatCompactTimeLeft(totalMinutes: number): string {

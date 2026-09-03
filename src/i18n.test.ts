@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyDocumentTranslations,
+  formatChapterPagesLeft,
   formatCompactTimeLeft,
   getLanguage,
   normalizeLanguage,
@@ -60,5 +61,17 @@ describe('interface localization', () => {
     expect(formatCompactTimeLeft(61)).toBe('До конца 1 час 1 минута');
     expect(formatCompactTimeLeft(120)).toBe('До конца 2 часа');
     expect(formatCompactTimeLeft(25)).toBe('До конца 25 минут');
+  });
+
+  it('formats pages remaining in the current chapter with Russian plural forms', () => {
+    expect(formatChapterPagesLeft(1)).toBe('1 page left in chapter');
+    expect(formatChapterPagesLeft(24)).toBe('24 pages left in chapter');
+
+    setLanguage('ru');
+    expect(formatChapterPagesLeft(1)).toBe('До конца главы 1 страница');
+    expect(formatChapterPagesLeft(2)).toBe('До конца главы 2 страницы');
+    expect(formatChapterPagesLeft(5)).toBe('До конца главы 5 страниц');
+    expect(formatChapterPagesLeft(21)).toBe('До конца главы 21 страница');
+    expect(formatChapterPagesLeft(24)).toBe('До конца главы 24 страницы');
   });
 });

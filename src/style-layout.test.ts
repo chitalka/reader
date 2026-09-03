@@ -16,6 +16,11 @@ describe('reader layout styles', () => {
     );
   });
 
+  it('uses a stable mobile viewport height so Safari chrome does not repaginate the book', () => {
+    expect(stylesheet).toMatch(/\.reader-shell \{[\s\S]*?height: 100svh;/u);
+    expect(stylesheet).not.toMatch(/\.reader-shell \{[\s\S]*?height: 100dvh;/u);
+  });
+
   it('keeps the fast progress visible while exact pagination is pending', () => {
     expect(stylesheet).not.toContain('.progress-group.is-pending .progress-copy');
     expect(stylesheet).not.toContain('.reader-footer.is-pending .fullscreen-reader-status');

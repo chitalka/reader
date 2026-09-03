@@ -55,6 +55,8 @@ describe('reader shell accessibility', () => {
     );
     expect(modes.map((input) => input.value)).toEqual(['page', 'progress', 'none']);
     expect(markup.querySelector('#time-label-compact')).not.toBeNull();
+    expect(markup.querySelector('#chapter-pages-left')?.textContent)
+      .toBe('Pages left in chapter…');
     const fullscreenStatus = markup.querySelector('#fullscreen-reader-status');
     expect(fullscreenStatus?.getAttribute('aria-hidden')).toBe('true');
     expect(fullscreenStatus?.querySelector('#fullscreen-progress-percent')).not.toBeNull();

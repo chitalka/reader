@@ -1422,7 +1422,9 @@ button:disabled {
 
 .reader-shell {
   position: relative;
-  height: 100dvh;
+  height: 100vh;
+  /* Stable against mobile Safari's expanding and collapsing browser chrome. */
+  height: 100svh;
   min-height: 0;
 }
 
@@ -3043,7 +3045,7 @@ textarea {
   text-transform: none;
 }
 
-.progress-copy #progress-percent {
+.progress-copy #chapter-pages-left {
   justify-self: start;
 }
 
@@ -3195,7 +3197,7 @@ progress::-moz-progress-bar {
   text-transform: none;
 }
 
-.progress-copy #progress-percent { justify-self: start; }
+.progress-copy #chapter-pages-left { justify-self: start; }
 .progress-copy #page-label { justify-self: center; }
 .progress-copy #time-label { justify-self: end; }
 

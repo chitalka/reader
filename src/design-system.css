@@ -841,7 +841,7 @@ a:focus-visible {
     font-size: 10px;
   }
 
-  .progress-copy #progress-percent {
+  .progress-copy #chapter-pages-left {
     justify-self: start;
   }
 

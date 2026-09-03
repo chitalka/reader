@@ -9,10 +9,10 @@ describe('ReaderPager', () => {
   let pager: ReaderPager;
   let animateDescriptor: PropertyDescriptor | undefined;
 
-  function anchor(id: string, page: number, top: number): HTMLElement {
+  function anchor(id: string, page: number, top: number, extent = 566): HTMLElement {
     const element = document.createElement('div');
     element.dataset.readerAnchor = id;
-    const left = page * 566 + 10;
+    const left = page * extent + 10;
     const rect = {
       left,
       right: left + 100,
@@ -317,6 +317,54 @@ describe('ReaderPager', () => {
       ['part', 'chapter-1', 'chapter-2'],
       pager.getSnapshot().anchor,
     )).toBe('chapter-1');
+  });
+
+  it('counts pages left in a chapter from the left page of a two-page spread', async () => {
+    const fragment = document.createDocumentFragment();
+    fragment.append(
+      anchor('chapter-1', 0, 40),
+      anchor('reading-place', 2, 80),
+      anchor('chapter-2', 4, 80),
+    );
+    await pager.setBook(fragment, { anchor: 'reading-place' });
+
+    expect(pager.getSnapshot()).toMatchObject({ currentPage: 3, pagesPerView: 2 });
+    expect(pager.pagesRemainingUntilAnchor('chapter-2')).toBe(2);
+    expect(pager.pagesRemainingUntilAnchor()).toBe(3);
+  });
+
+  it('counts the current page in one-page mode', async () => {
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 5180 });
+    pager.setPageMode('one');
+    const fragment = document.createDocumentFragment();
+    fragment.append(
+      anchor('chapter-1', 0, 40, 1036),
+      anchor('reading-place', 2, 80, 1036),
+      anchor('chapter-2', 4, 80, 1036),
+    );
+    await pager.setBook(fragment, { anchor: 'reading-place' });
+
+    expect(pager.getSnapshot()).toMatchObject({ currentPage: 3, pagesPerView: 1 });
+    expect(pager.pagesRemainingUntilAnchor('chapter-2')).toBe(2);
+  });
+
+  it('does not include appendix footnotes in the last chapter remainder', async () => {
+    Object.defineProperty(content, 'scrollWidth', { configurable: true, value: 2698 });
+    const chapter = chunk(
+      anchor('last-chapter', 0, 40),
+      anchor('reading-place', 2, 80),
+    );
+    const notes = chunk(anchor('notes', 0, 40));
+    notes.dataset.readerNotes = '';
+
+    await pager.setBook(chunkedBook(chapter, notes));
+    pager.last();
+    expect(pager.goToAnchor('reading-place')).toBe(true);
+
+    expect(pager.pagesRemainingUntilAnchor()).toBe(3);
+    pager.last();
+    expect(pager.getSnapshot().chunkIndex).toBe(1);
+    expect(pager.pagesRemainingUntilAnchor()).toBeUndefined();
   });
 
   it('keeps a selected table-of-contents target until the next page turn', async () => {

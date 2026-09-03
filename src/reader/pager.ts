@@ -90,7 +90,9 @@ export class ReaderPager {
   private idElements = new Map<string, HTMLElement>();
   private idChunks = new Map<string, number>();
   private chunkPageCounts = new Map<number, number>();
+  private anchorPages = new Map<string, number>();
   private readonly layoutPageCountCache = new Map<string, Map<number, number>>();
+  private readonly layoutAnchorPageCache = new Map<string, Map<string, number>>();
   private layout?: LayoutGeometry;
   private estimatedWordsPerPage = 100;
   private measurementGeneration = 0;
@@ -143,7 +145,9 @@ export class ReaderPager {
     this.cancelMeasurements();
     this.cancelNavigationAnimations();
     this.layoutPageCountCache.clear();
+    this.layoutAnchorPageCache.clear();
     this.chunkPageCounts.clear();
+    this.anchorPages.clear();
     this.anchorElements.clear();
     this.anchorChunks.clear();
     this.anchorOrder.clear();
@@ -214,8 +218,12 @@ export class ReaderPager {
   repaginate(): void {
     if (!this.bookRoot || !this.chunks.length) return;
     this.cancelMeasurements();
-    if (this.layout) this.layoutPageCountCache.delete(this.layout.key);
+    if (this.layout) {
+      this.layoutPageCountCache.delete(this.layout.key);
+      this.layoutAnchorPageCache.delete(this.layout.key);
+    }
     this.chunkPageCounts.clear();
+    this.anchorPages.clear();
     this.layout = undefined;
     this.scheduleLayout();
   }
@@ -400,6 +408,45 @@ export class ReaderPager {
       }
     }
     return active;
+  }
+
+  pagesRemainingUntilAnchor(target?: string): number | undefined {
+    if (!this.layout || !this.getSnapshot().paginationExact) return undefined;
+    const currentNavigationIndex = this.navigationChunks.indexOf(this.currentChunkIndex);
+    if (currentNavigationIndex < 0 || this.chunks[this.currentChunkIndex]?.notes) return undefined;
+
+    const currentCount = this.chunkPageCounts.get(this.currentChunkIndex);
+    if (currentCount === undefined) return undefined;
+    let remaining = Math.max(1, currentCount - this.currentColumn);
+    const targetChunk = target === undefined ? undefined : this.anchorChunks.get(target);
+    if (target !== undefined && targetChunk === undefined) return undefined;
+    const firstNotesIndex = this.navigationChunks.findIndex((chunkIndex, index) => (
+      index > currentNavigationIndex && this.chunks[chunkIndex]?.notes
+    ));
+    const targetNavigationIndex = targetChunk === undefined
+      ? firstNotesIndex >= 0 ? firstNotesIndex : this.navigationChunks.length
+      : this.navigationChunks.indexOf(targetChunk);
+    if (targetNavigationIndex < currentNavigationIndex) return undefined;
+
+    if (targetNavigationIndex === currentNavigationIndex && target) {
+      const targetPage = this.anchorPages.get(target);
+      return targetPage === undefined
+        ? undefined
+        : Math.max(1, targetPage - this.currentColumn);
+    }
+
+    for (let index = currentNavigationIndex + 1; index < targetNavigationIndex; index += 1) {
+      const count = this.chunkPageCounts.get(this.navigationChunks[index]!);
+      if (count === undefined) return undefined;
+      remaining += count;
+    }
+
+    if (target && targetChunk !== undefined) {
+      const targetPage = this.anchorPages.get(target);
+      if (targetPage === undefined) return undefined;
+      remaining += targetPage;
+    }
+    return Math.max(1, remaining);
   }
 
   getSnapshot(): PagerSnapshot {
@@ -719,6 +766,8 @@ export class ReaderPager {
     if (layoutChanged) {
       const cachedCounts = this.layoutPageCountCache.get(geometry.key);
       this.chunkPageCounts = new Map(cachedCounts ?? []);
+      const cachedAnchorPages = this.layoutAnchorPageCache.get(geometry.key);
+      this.anchorPages = new Map(cachedAnchorPages ?? []);
       this.estimatedWordsPerPage = this.initialWordsPerPage(geometry);
     }
 
@@ -730,6 +779,7 @@ export class ReaderPager {
     } else {
       this.pageCount = cachedPageCount;
     }
+    this.recordAnchorPages(this.currentChunkIndex, this.content, mountedChunk.element, geometry);
 
     const restoreAnchorChunk = restore.anchor && this.anchorChunks.get(restore.anchor);
     const restoreElement = restore.anchor && this.anchorElements.get(restore.anchor);
@@ -1112,6 +1162,40 @@ export class ReaderPager {
   private invalidateChunkPageCount(chunkIndex: number): void {
     this.chunkPageCounts.delete(chunkIndex);
     if (this.layout) this.layoutPageCountCache.get(this.layout.key)?.delete(chunkIndex);
+    for (const anchor of this.chunks[chunkIndex]?.anchors ?? []) {
+      const id = anchor.dataset.readerAnchor;
+      if (id === undefined) continue;
+      this.anchorPages.delete(id);
+      if (this.layout) this.layoutAnchorPageCache.get(this.layout.key)?.delete(id);
+    }
+  }
+
+  private recordAnchorPages(
+    chunkIndex: number,
+    container: HTMLElement,
+    element: HTMLElement,
+    geometry: LayoutGeometry,
+  ): void {
+    if (!this.layout || geometry.key !== this.layout.key) return;
+    let cached = this.layoutAnchorPageCache.get(geometry.key);
+    if (!cached) {
+      cached = new Map();
+      this.layoutAnchorPageCache.set(geometry.key, cached);
+    }
+    const containerLeft = container.getBoundingClientRect().left;
+    const anchors = [
+      ...(element.dataset.readerAnchor === undefined ? [] : [element]),
+      ...Array.from(element.querySelectorAll<HTMLElement>('[data-reader-anchor]')),
+    ];
+    for (const anchor of anchors) {
+      const id = anchor.dataset.readerAnchor;
+      if (id === undefined || this.anchorChunks.get(id) !== chunkIndex) continue;
+      const rect = this.firstRect(anchor);
+      const offset = Math.max(0, rect.left - containerLeft);
+      const page = Math.max(0, Math.floor(offset / geometry.pageExtent + 0.02));
+      this.anchorPages.set(id, page);
+      cached.set(id, page);
+    }
   }
 
   private pageCountForSnapshot(chunkIndex: number): number {
@@ -1259,6 +1343,7 @@ export class ReaderPager {
       void measurements[0]?.measurer.offsetWidth;
       for (const { chunkIndex, clone, measurer } of measurements) {
         counts.set(chunkIndex, this.pagesForElement(measurer, clone, geometry));
+        this.recordAnchorPages(chunkIndex, measurer, clone, geometry);
       }
     } finally {
       for (const { measurer } of measurements) measurer.remove();

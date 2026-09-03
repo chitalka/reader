@@ -60,6 +60,7 @@ import type { CloudProvider, ProviderStatusEvent } from './sync/provider';
 import { hideLoadingOverlay, showLoadingOverlay } from './splash';
 import {
   applyDocumentTranslations,
+  formatChapterPagesLeft,
   formatCompactTimeLeft,
   getLanguage,
   normalizeLanguage,
@@ -179,7 +180,7 @@ export class ChitalkaApp {
   private readonly pagingControls = requiredElement<HTMLElement>('paging-controls');
   private readonly progressGroup = requiredElement<HTMLElement>('progress-group');
   private readonly progress = requiredElement<HTMLProgressElement>('book-progress');
-  private readonly progressPercent = requiredElement<HTMLElement>('progress-percent');
+  private readonly chapterPagesLeft = requiredElement<HTMLElement>('chapter-pages-left');
   private readonly pageLabel = requiredElement<HTMLElement>('page-label');
   private readonly timeLabel = requiredElement<HTMLElement>('time-label');
   private readonly compactTimeLabel = requiredElement<HTMLElement>('time-label-compact');
@@ -691,8 +692,14 @@ export class ChitalkaApp {
     if (this.progress.value !== snapshot.progress) this.progress.value = snapshot.progress;
     const roundedProgress = Math.round(snapshot.progress);
     const progressText = `${roundedProgress}%`;
-    if (this.progressPercent.textContent !== progressText) {
-      this.progressPercent.textContent = progressText;
+    const chapterPages = snapshot.paginationExact
+      ? this.pagesRemainingInCurrentChapter(snapshot)
+      : undefined;
+    const chapterPagesText = chapterPages === undefined
+      ? t('reader.chapterPagesPending')
+      : formatChapterPagesLeft(chapterPages);
+    if (this.chapterPagesLeft.textContent !== chapterPagesText) {
+      this.chapterPagesLeft.textContent = chapterPagesText;
     }
     if (this.fullscreenProgressPercent.textContent !== progressText) {
       this.fullscreenProgressPercent.textContent = progressText;
@@ -759,6 +766,20 @@ export class ChitalkaApp {
   private skimChapterForAnchor(anchor: string | undefined): string {
     const target = this.pager.closestPrecedingAnchor(this.currentTocTargets, anchor);
     return (target && this.currentTocLabels.get(target)) || this.currentBookTitle || t('app.name');
+  }
+
+  private pagesRemainingInCurrentChapter(snapshot: PagerSnapshot): number | undefined {
+    const currentTarget = this.pager.closestPrecedingAnchor(
+      this.currentTocTargets,
+      snapshot.anchor,
+    );
+    const currentIndex = currentTarget === undefined
+      ? -1
+      : this.currentTocTargets.indexOf(currentTarget);
+    const nextTarget = currentIndex >= 0
+      ? this.currentTocTargets[currentIndex + 1]
+      : this.currentTocTargets[0];
+    return this.pager.pagesRemainingUntilAnchor(nextTarget);
   }
 
   private setPaginationPending(pending: boolean): void {
