@@ -58,6 +58,8 @@ import {
 } from './reader/analytics';
 import type { CloudProvider, ProviderStatusEvent } from './sync/provider';
 import { hideLoadingOverlay, showLoadingOverlay } from './splash';
+import { MobileSafariViewportController } from './mobile-safari-viewport';
+import { populateReadingPreview } from './settings-preview';
 import {
   applyDocumentTranslations,
   formatChapterPagesLeft,
@@ -75,11 +77,13 @@ import {
   normalizeFullscreenStatusMode,
   normalizePageButtonsMode,
   normalizeTheme,
+  normalizeTextAlignment,
   type FootnoteMode,
   type FullscreenStatusMode,
   type PageButtonsMode,
   type ReaderSettings,
   type Theme,
+  type TextAlignment,
 } from './settings';
 
 const demoBookUrl = new URL('../books/Anna-Karenina.fb2', import.meta.url);
@@ -197,6 +201,9 @@ export class ChitalkaApp {
   private readonly fontDownButton = requiredElement<HTMLButtonElement>('font-down');
   private readonly fontUpButton = requiredElement<HTMLButtonElement>('font-up');
   private readonly fontSizeValue = requiredElement<HTMLOutputElement>('font-size-value');
+  private readonly readingPreview = requiredElement<HTMLElement>('reading-preview');
+  private readonly tocBookTitle = requiredElement<HTMLElement>('toc-book-title');
+  private readonly tocBookAuthor = requiredElement<HTMLElement>('toc-book-author');
   private readonly settingsButton = requiredElement<HTMLButtonElement>('settings-button');
   private readonly settingsPanel = requiredElement<HTMLElement>('settings-panel');
   private readonly settingsBackdrop = requiredElement<HTMLElement>('settings-backdrop');
@@ -251,6 +258,7 @@ export class ChitalkaApp {
   private readonly analyticsClearConfirm = requiredElement<HTMLButtonElement>('analytics-clear-confirm');
   private readonly languageSelect = requiredElement<HTMLSelectElement>('language-select');
   private readonly themeInputs = requiredInputs('theme');
+  private readonly alignmentInputs = requiredInputs('text-alignment');
   private readonly pageModeInputs = requiredInputs('page-mode');
   private readonly pageButtonInputs = requiredInputs('page-buttons');
   private readonly fullscreenStatusInputs = requiredInputs('fullscreen-status');
@@ -273,6 +281,7 @@ export class ChitalkaApp {
   private readonly annotationPanelController: AnnotationPanelController;
   private readonly quoteMenuController: QuoteMenuController;
   private readonly skimController: SkimController;
+  private readonly mobileSafariViewportController: MobileSafariViewportController;
 
   constructor() {
     activateLanguage(this.settings.language);
@@ -361,6 +370,10 @@ export class ChitalkaApp {
         },
       },
     );
+    this.mobileSafariViewportController = new MobileSafariViewportController(
+      this.dropZone,
+      this.appRoot,
+    );
   }
 
   async start(): Promise<void> {
@@ -369,6 +382,7 @@ export class ChitalkaApp {
     this.applySettings();
     this.bindEvents();
     this.bindSynchronization();
+    this.mobileSafariViewportController.start();
     this.headerVisibility.reveal();
 
     try {
@@ -386,6 +400,7 @@ export class ChitalkaApp {
       fontSize: Number.isFinite(value.fontSize)
         ? Math.min(28, Math.max(14, value.fontSize))
         : DEFAULT_SETTINGS.fontSize,
+      textAlignment: normalizeTextAlignment(value.textAlignment),
       pageMode: pageModes.includes(value.pageMode) ? value.pageMode : DEFAULT_SETTINGS.pageMode,
       pageButtons: normalizePageButtonsMode(value.pageButtons),
       fullscreenStatus: normalizeFullscreenStatusMode(value.fullscreenStatus),
@@ -402,6 +417,7 @@ export class ChitalkaApp {
 
   private applySettings(): void {
     this.applyLanguage();
+    document.documentElement.dataset.textAlignment = this.settings.textAlignment;
     this.pager.setFontSize(this.settings.fontSize);
     this.pager.setPageMode(this.settings.pageMode);
     this.content.querySelector<HTMLElement>('.book')
@@ -418,6 +434,11 @@ export class ChitalkaApp {
     this.nextButton.addEventListener('click', () => this.navigate(() => this.pager.next()));
     this.fontDownButton.addEventListener('click', () => this.changeFontSize(-2));
     this.fontUpButton.addEventListener('click', () => this.changeFontSize(2));
+    for (const input of this.alignmentInputs) {
+      input.addEventListener('change', () => {
+        if (input.checked) this.setTextAlignment(input.value as TextAlignment);
+      });
+    }
     for (const input of this.themeInputs) {
       input.addEventListener('change', () => {
         if (input.checked) this.setTheme(input.value as Theme);
@@ -563,6 +584,9 @@ export class ChitalkaApp {
     this.currentTocTargets = tocTargets(rendered.toc);
     this.currentTocLabels = tocPathLabels(rendered.toc);
     this.tocPanelController.setItems(rendered.toc);
+    this.tocBookTitle.textContent = rendered.metadata.title;
+    this.tocBookAuthor.textContent = rendered.metadata.authors.join(', ');
+    populateReadingPreview(this.readingPreview, rendered.fragment, rendered.metadata);
     this.backPosition = undefined;
     this.backSwipeEnabled = false;
     this.backButton.hidden = true;
@@ -606,6 +630,9 @@ export class ChitalkaApp {
     this.settingsPanelController.close(false);
     this.annotationPanelController.close(false);
     this.tocPanelController.setItems([]);
+    this.tocBookTitle.textContent = '';
+    this.tocBookAuthor.textContent = '';
+    this.readingPreview.replaceChildren();
     this.isPreparing = true;
     this.currentBookFilename = undefined;
     this.currentBookTitle = undefined;
@@ -1038,6 +1065,15 @@ export class ChitalkaApp {
     this.updateSettingsControls();
   }
 
+  private setTextAlignment(alignment: TextAlignment): void {
+    if (alignment === this.settings.textAlignment) return;
+    this.settings.textAlignment = alignment;
+    document.documentElement.dataset.textAlignment = alignment;
+    this.saveSettings('textAlignment');
+    this.updateSettingsControls();
+    this.pager.relayout();
+  }
+
   private setPageButtons(mode: PageButtonsMode): void {
     if (mode === this.settings.pageButtons) return;
     this.settings.pageButtons = mode;
@@ -1083,6 +1119,8 @@ export class ChitalkaApp {
 
   private updateSettingsControls(): void {
     this.fontSizeValue.textContent = `${this.settings.fontSize} px`;
+    this.readingPreview.style.setProperty('--preview-font-size', `${this.settings.fontSize}px`);
+    for (const input of this.alignmentInputs) input.checked = input.value === this.settings.textAlignment;
     for (const input of this.themeInputs) input.checked = input.value === this.settings.theme;
     for (const input of this.pageModeInputs) input.checked = input.value === this.settings.pageMode;
     for (const input of this.pageButtonInputs) {
@@ -1296,7 +1334,7 @@ export class ChitalkaApp {
     const target = this.pager.closestPrecedingAnchor(this.currentTocTargets, snapshot.anchor);
     if (!target) return undefined;
     return Array.from(this.tocList.querySelectorAll<HTMLButtonElement>('[data-toc-target]'))
-      .find((button) => button.dataset.tocTarget === target)?.textContent?.trim();
+      .filter((button) => button.dataset.tocTarget === target).at(-1)?.title;
   }
 
   private async createBookmark(note: string, color: AnnotationColor): Promise<void> {

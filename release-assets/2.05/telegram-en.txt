@@ -1,0 +1,12 @@
+Chitalka 2.05
+
+• Refined typography and page margins.
+• Reading settings now include a live text preview, theme cards, and alignment choices.
+• Collapsible contents highlight the current chapter.
+• A new mobile bottom toolbar appears with a tap, without shifting the page.
+• A larger tiger-face icon on a light background for the iPhone Home Screen.
+
+Also fixed text disappearing when controls hide and improved keyboard navigation.
+
+Demo: https://chitalka.github.io/demo/
+Full notes: https://github.com/chitalka/reader/releases/tag/v2.05

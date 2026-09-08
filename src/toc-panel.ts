@@ -1,5 +1,6 @@
 import type { BookTocItem } from './book/model';
 import { setMotionOrigin, VisibilityMotion } from './motion';
+import { t } from './i18n';
 
 export interface TocPanelElements {
   button: HTMLButtonElement;
@@ -62,10 +63,12 @@ export class TocPanelController {
     const active = Array.from(
       this.elements.list.querySelectorAll<HTMLButtonElement>('[data-toc-target]'),
     ).filter((button) => button.dataset.tocTarget === target).at(-1);
+    if (active?.getAttribute('aria-current') === 'location') return;
     for (const button of this.elements.list.querySelectorAll<HTMLButtonElement>('[aria-current]')) {
       button.removeAttribute('aria-current');
     }
     active?.setAttribute('aria-current', 'location');
+    if (active) this.revealAncestors(active);
   }
 
   open(): void {
@@ -77,6 +80,7 @@ export class TocPanelController {
     this.syncMode();
     this.onOpenChange(true);
     const active = this.elements.list.querySelector<HTMLElement>('[aria-current="location"]');
+    if (active) this.revealAncestors(active);
     (active ?? this.elements.closeButton).focus();
     active?.scrollIntoView?.({ block: 'nearest' });
   }
@@ -98,24 +102,60 @@ export class TocPanelController {
     list.className = 'toc-list';
     for (const item of items) {
       const listItem = document.createElement('li');
+      let parent: HTMLElement = listItem;
+      if (item.children.length) {
+        const details = document.createElement('details');
+        details.className = 'toc-branch';
+        const summary = document.createElement('summary');
+        summary.className = 'toc-summary';
+        summary.textContent = item.title;
+        const children = document.createElement('div');
+        children.className = 'toc-children';
+        details.append(summary, children);
+        listItem.append(details);
+        parent = children;
+      }
       if (item.target) {
         const button = document.createElement('button');
         button.className = 'toc-link';
         button.type = 'button';
         button.dataset.tocTarget = item.target;
-        button.textContent = item.title;
+        const label = document.createElement('span');
+        label.textContent = item.children.length ? t('toc.sectionStart') : item.title;
+        if (item.children.length) label.dataset.i18n = 'toc.sectionStart';
+        const current = document.createElement('span');
+        current.className = 'toc-current-label';
+        current.dataset.i18n = 'toc.current';
+        current.textContent = t('toc.current');
+        button.append(label, current);
         button.title = item.title;
-        listItem.append(button);
-      } else {
+        parent.append(button);
+      } else if (!item.children.length) {
         const label = document.createElement('span');
         label.className = 'toc-label';
         label.textContent = item.title;
         listItem.append(label);
       }
-      listItem.append(...this.renderItems(item.children));
+      parent.append(...this.renderItems(item.children));
       list.append(listItem);
     }
     return [list];
+  }
+
+  private revealAncestors(element: HTMLElement): void {
+    for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      if (ancestor instanceof HTMLDetailsElement) ancestor.open = true;
+      if (ancestor === this.elements.list) break;
+    }
+  }
+
+  private isVisibleEntry(element: HTMLElement): boolean {
+    for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      if (ancestor instanceof HTMLDetailsElement && !ancestor.open
+        && ancestor.querySelector(':scope > summary') !== element) return false;
+      if (ancestor === this.elements.panel) break;
+    }
+    return true;
   }
 
   private readonly handleToggle = (): void => {
@@ -159,8 +199,8 @@ export class TocPanelController {
     if (event.key !== 'Tab') return;
 
     const focusable = Array.from(this.elements.panel.querySelectorAll<HTMLElement>(
-      'button:not([disabled])',
-    ));
+      'button:not([disabled]), summary',
+    )).filter((element) => this.isVisibleEntry(element));
     const first = focusable[0];
     const last = focusable.at(-1);
     if (!first || !last) return;

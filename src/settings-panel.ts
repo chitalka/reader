@@ -103,10 +103,16 @@ export class SettingsPanelController {
 
     if (event.key !== 'Tab') return;
     const focusable = Array.from(this.elements.panel.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]',
-    ));
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [tabindex="0"]',
+    )).filter((element) => !element.closest('[hidden], [inert]'));
+    const tabStops = focusable.filter((element) => {
+      if (!(element instanceof HTMLInputElement) || element.type !== 'radio' || !element.name) return true;
+      const group = focusable.filter((candidate): candidate is HTMLInputElement =>
+        candidate instanceof HTMLInputElement && candidate.type === 'radio' && candidate.name === element.name);
+      return element === (group.find((radio) => radio.checked) ?? group[0]);
+    });
+    const first = tabStops[0];
+    const last = tabStops.at(-1);
     if (!first || !last) return;
 
     if (event.shiftKey && document.activeElement === first) {

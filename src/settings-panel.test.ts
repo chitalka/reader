@@ -118,4 +118,17 @@ describe('SettingsPanelController', () => {
     expect(onOpenChange).toHaveBeenNthCalledWith(1, true);
     expect(onOpenChange).toHaveBeenNthCalledWith(2, false);
   });
+
+  it('traps focus using the selected radio and skips hidden settings sections', () => {
+    panel.insertAdjacentHTML('beforeend', `
+      <input type="radio" name="theme" />
+      <section hidden><button>Hidden action</button></section>
+    `);
+    button.click();
+    const selected = panel.querySelector<HTMLInputElement>('input:checked')!;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }));
+    expect(document.activeElement).toBe(selected);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(document.activeElement).toBe(closeButton);
+  });
 });

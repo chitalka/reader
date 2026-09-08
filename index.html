@@ -13,7 +13,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="./icons/favicon-16.png" />
     <link rel="icon" type="image/svg+xml" sizes="any" href="./icons/favicon.svg" />
-    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <link rel="apple-touch-icon" type="image/png" sizes="180x180" href="./icons/apple-touch-icon.png?v=face-1" />
     <link rel="preload" href="./icons/icon-192.png" as="image" type="image/png" />
     <script>
       (() => {
@@ -176,6 +176,7 @@
               <path d="M9 6h11M9 12h11M9 18h11" />
               <path d="M4 6h.01M4 12h.01M4 18h.01" />
             </svg>
+            <span class="toolbar-label" aria-hidden="true" data-i18n="toolbar.toc">Contents</span>
           </button>
           <button
             id="annotations-button"
@@ -193,6 +194,7 @@
             <svg class="bookmark-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M6.5 3.5h11v17L12 17l-5.5 3.5v-17Z" />
             </svg>
+            <span class="toolbar-label" aria-hidden="true" data-i18n="toolbar.bookmarks">Bookmarks</span>
           </button>
           <button
             id="settings-button"
@@ -210,6 +212,8 @@
               <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
+            <span class="mobile-type-icon" aria-hidden="true">Aa</span>
+            <span class="toolbar-label" aria-hidden="true" data-i18n="toolbar.appearance">Style</span>
           </button>
           <input
             id="book-file"
@@ -223,6 +227,8 @@
             <svg class="upload-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 16V4m-4 4 4-4 4 4M5 14v5h14v-5" />
             </svg>
+            <svg class="mobile-folder-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V4h6l2 3h10v13H3V7Zm0 3h18" /></svg>
+            <span class="toolbar-label" aria-hidden="true" data-i18n="toolbar.book">Book</span>
           </label>
         </div>
       </header>
@@ -241,7 +247,9 @@
             <svg class="close-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
           </button>
         </div>
+        <div class="toc-book-heading"><strong id="toc-book-title"></strong><span id="toc-book-author"></span></div>
         <nav id="toc-list-root" class="toc-navigation" aria-label="Book sections" data-i18n-aria-label="toc.sections"></nav>
+        <p class="toc-hint" data-i18n="toc.expandHint">Expand a section to choose a chapter</p>
       </section>
 
       <div id="annotations-backdrop" class="panel-backdrop annotations-backdrop" hidden></div>
@@ -315,31 +323,43 @@
           </nav>
           <div class="settings-content">
             <div id="settings-reading-view" class="settings-view" data-settings-view="reading">
+              <div class="reading-settings-controls">
 
         <fieldset class="settings-group">
           <legend data-i18n="settings.fontSize">Font size</legend>
           <div class="font-size-control">
             <button id="font-down" class="setting-step" type="button" aria-label="Decrease font size" data-i18n-aria-label="settings.fontDecrease" title="Decrease font size" data-i18n-title="settings.fontDecrease">−</button>
-            <output id="font-size-value" aria-live="polite">18 px</output>
+            <output id="font-size-value" aria-live="polite">20 px</output>
             <button id="font-up" class="setting-step" type="button" aria-label="Increase font size" data-i18n-aria-label="settings.fontIncrease" title="Increase font size" data-i18n-title="settings.fontIncrease">+</button>
           </div>
         </fieldset>
 
         <fieldset class="settings-group">
           <legend data-i18n="settings.theme">Theme</legend>
-          <div class="segmented-control">
-            <label class="setting-option">
+          <div class="theme-options">
+            <label class="theme-option theme-option--light">
               <input type="radio" name="theme" value="light" />
-              <span data-i18n="settings.themeLight">Light</span>
+              <span class="theme-sample" aria-hidden="true">Aa</span>
+              <span class="theme-name" data-i18n="settings.themeLight">Light</span>
             </label>
-            <label class="setting-option">
+            <label class="theme-option theme-option--auto">
               <input type="radio" name="theme" value="auto" />
-              <span data-i18n="settings.themeAuto">Auto</span>
+              <span class="theme-sample" aria-hidden="true">Aa</span>
+              <span class="theme-name" data-i18n="settings.themeAuto">Auto</span>
             </label>
-            <label class="setting-option">
+            <label class="theme-option theme-option--dark">
               <input type="radio" name="theme" value="dark" />
-              <span data-i18n="settings.themeDark">Dark</span>
+              <span class="theme-sample" aria-hidden="true">Aa</span>
+              <span class="theme-name" data-i18n="settings.themeDark">Dark</span>
             </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="settings-group">
+          <legend data-i18n="settings.alignment">Text alignment</legend>
+          <div class="segmented-control">
+            <label class="setting-option"><input type="radio" name="text-alignment" value="start" /><span data-i18n="settings.alignStart">Left aligned</span></label>
+            <label class="setting-option"><input type="radio" name="text-alignment" value="justify" /><span data-i18n="settings.alignJustify">Justified</span></label>
           </div>
         </fieldset>
 
@@ -348,8 +368,8 @@
           <label class="language-select" data-language-switcher title="Interface language" data-i18n-title="language.label">
             <span id="language-select-label" class="visually-hidden" data-i18n="language.label">Interface language</span>
             <select id="language-select" aria-labelledby="language-select-label">
-              <option value="en">En</option>
-              <option value="ru">Ru</option>
+              <option value="en">English</option>
+              <option value="ru">Русский</option>
             </select>
             <svg viewBox="0 0 12 8" aria-hidden="true"><path d="m1 1.5 5 5 5-5" /></svg>
           </label>
@@ -423,6 +443,13 @@
           </div>
         </fieldset>
 
+            </div>
+
+              <aside class="reading-preview" aria-labelledby="reading-preview-label">
+                <h3 id="reading-preview-label" data-i18n="settings.preview">Preview</h3>
+                <div id="reading-preview" class="reading-preview-page" tabindex="0" role="region" aria-labelledby="reading-preview-label"></div>
+                <p class="reading-preview-hint" data-i18n="settings.previewHint">Your changes appear here as you make them.</p>
+              </aside>
             </div>
 
             <section id="settings-analytics-view" class="settings-view analytics-view" data-settings-view="analytics" hidden>
@@ -523,7 +550,7 @@
             <span aria-hidden="true">·</span>
             <a href="https://github.com/chitalka/reader/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
             <span aria-hidden="true">·</span>
-            <span>v.2.04</span>
+            <span>v.2.05</span>
           </p>
         </div>
             </div>

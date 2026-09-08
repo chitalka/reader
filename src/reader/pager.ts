@@ -829,7 +829,7 @@ export class ReaderPager {
       pageExtent,
       viewportHeight,
       viewportWidth,
-      key: [viewportWidth, viewportHeight, pagesPerView, this.fontSize, footnoteMode].join(':'),
+      key: [viewportWidth, viewportHeight, pagesPerView, this.fontSize, footnoteMode, contentStyle.textAlign].join(':'),
     };
   }
 

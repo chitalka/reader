@@ -5,6 +5,7 @@ import {
   normalizeFullscreenStatusMode,
   normalizePageButtonsMode,
   normalizeTheme,
+  normalizeTextAlignment,
 } from './settings';
 
 describe('reader settings', () => {
@@ -22,6 +23,13 @@ describe('reader settings', () => {
 
   it('uses the system color scheme by default', () => {
     expect(DEFAULT_SETTINGS.theme).toBe('auto');
+  });
+
+  it('defaults old settings to natural spacing and retains explicit justification', () => {
+    expect(normalizeTextAlignment(undefined)).toBe('start');
+    expect(normalizeTextAlignment('invalid')).toBe('start');
+    expect(normalizeTextAlignment('start')).toBe('start');
+    expect(normalizeTextAlignment('justify')).toBe('justify');
   });
 
   it.each(['auto', 'show', 'hide'] as const)('accepts the %s page button mode', (mode) => {

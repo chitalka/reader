@@ -70,7 +70,53 @@ describe('TocPanelController', () => {
     controller.setActive('same');
 
     const current = list.querySelector('[aria-current="location"]');
-    expect(current?.textContent).toBe('Глава');
+    expect(current?.getAttribute('title')).toBe('Глава');
+    expect(list.querySelectorAll('[aria-current]')).toHaveLength(1);
+  });
+
+  it('reveals the current chapter, preserves a manual collapse and reveals it on reopening', () => {
+    controller.setItems([{
+      title: 'Часть', target: 'part',
+      children: [{ title: 'Глава', target: 'chapter', children: [] }],
+    }]);
+    const branch = list.querySelector('details')!;
+    expect(branch.open).toBe(false);
+    controller.setActive('chapter');
+    expect(branch.open).toBe(true);
+    button.click();
+    branch.open = false;
+    controller.setActive('chapter');
+    expect(branch.open).toBe(false);
+    closeButton.click();
+    button.click();
+    expect(branch.open).toBe(true);
+    expect(document.activeElement?.getAttribute('data-toc-target')).toBe('chapter');
+  });
+
+  it('wraps keyboard focus through collapsed summaries without entering hidden chapters', () => {
+    controller.setItems([{
+      title: 'Часть', target: 'part',
+      children: [{ title: 'Глава', target: 'chapter', children: [] }],
+    }]);
+    button.click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }));
+    expect(document.activeElement).toBe(list.querySelector('summary'));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(document.activeElement).toBe(closeButton);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('keeps section targets reachable and clears old expansion and current state for a new book', () => {
+    const items = [{ title: 'Часть', target: 'part', children: [{ title: 'Глава', target: 'chapter', children: [] }] }];
+    controller.setItems(items);
+    controller.setActive('part');
+    button.click();
+    (list.querySelector('[data-toc-target="part"]') as HTMLButtonElement).click();
+    expect(onSelect).toHaveBeenCalledWith('part');
+    controller.setItems(items);
+    expect(list.querySelector('details')?.open).toBe(false);
+    expect(list.querySelector('[aria-current]')).toBeNull();
+    expect(panel.hidden).toBe(true);
   });
 
   it('hides the control when the book has no usable entries', () => {

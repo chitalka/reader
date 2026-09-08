@@ -42,7 +42,7 @@
   --ease-enter: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
   --font-interface: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-reader: Georgia, "Times New Roman", serif;
+  --font-reader: Charter, Georgia, "Times New Roman", serif;
   font-family: var(--font-interface);
   font-synthesis: none;
 }
@@ -495,7 +495,7 @@ button:disabled {
 }
 
 .book-heading strong {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-reader);
   font-size: 18px;
   font-weight: 600;
 }
@@ -1553,7 +1553,7 @@ button:disabled {
 
 .book p {
   margin: 0 0 0.75em;
-  text-align: justify;
+  text-align: inherit;
   text-indent: 1.35em;
   hanging-punctuation: first last;
   hyphens: auto;
@@ -3671,6 +3671,7 @@ progress::-moz-progress-bar {
 
 .reader-footer {
   position: relative;
+  bottom: var(--mobile-browser-bottom-inset, 0px);
 }
 
 .fullscreen-reader-status {

@@ -9,10 +9,12 @@ export type FullscreenStatusMode = typeof FULLSCREEN_STATUS_MODES[number];
 export const THEMES = ['auto', 'light', 'dark'] as const;
 export type Theme = typeof THEMES[number];
 export type EffectiveTheme = Exclude<Theme, 'auto'>;
+export type TextAlignment = 'start' | 'justify';
 
 export interface ReaderSettings {
   language: Language;
   fontSize: number;
+  textAlignment: TextAlignment;
   pageMode: PageMode;
   pageButtons: PageButtonsMode;
   fullscreenStatus: FullscreenStatusMode;
@@ -24,7 +26,8 @@ export interface ReaderSettings {
 
 export const DEFAULT_SETTINGS: ReaderSettings = {
   language: 'en',
-  fontSize: 18,
+  fontSize: 20,
+  textAlignment: 'start',
   pageMode: 'auto',
   pageButtons: 'auto',
   fullscreenStatus: 'progress',
@@ -33,6 +36,10 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   wordsPerMinute: 220,
   readingAnalytics: false,
 };
+
+export function normalizeTextAlignment(value: unknown): TextAlignment {
+  return value === 'justify' ? 'justify' : 'start';
+}
 
 export function normalizePageButtonsMode(value: unknown): PageButtonsMode {
   return PAGE_BUTTON_MODES.includes(value as PageButtonsMode) ? value as PageButtonsMode : 'auto';

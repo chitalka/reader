@@ -6,6 +6,7 @@ const STATIC_PWA_FILES = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
+  './icons/apple-touch-icon.png?v=face-1',
 ];
 
 export const YANDEX_METRIKA_ID = 111720126;

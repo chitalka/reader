@@ -19,6 +19,9 @@ describe('reader layout styles', () => {
   it('uses a stable mobile viewport height so Safari chrome does not repaginate the book', () => {
     expect(stylesheet).toMatch(/\.reader-shell \{[\s\S]*?height: 100svh;/u);
     expect(stylesheet).not.toMatch(/\.reader-shell \{[\s\S]*?height: 100dvh;/u);
+    expect(stylesheet).toMatch(
+      /\.reader-footer \{[\s\S]*?bottom: var\(--mobile-browser-bottom-inset, 0px\);/u,
+    );
   });
 
   it('keeps the fast progress visible while exact pagination is pending', () => {

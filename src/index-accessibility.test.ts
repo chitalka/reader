@@ -80,7 +80,7 @@ describe('reader shell accessibility', () => {
     expect(author?.getAttribute('rel')).toBe('noopener noreferrer');
     expect(license?.textContent).toBe('MIT License');
     expect(projectInfo?.textContent?.replace(/\s+/gu, ' ').trim())
-      .toBe('© 2026 · Oleg Mokhov · MIT License · v.2.04');
+      .toBe('© 2026 · Oleg Mokhov · MIT License · v.2.05');
   });
 
   it('provides localized About content and both public update channels', () => {
@@ -120,8 +120,9 @@ describe('reader shell accessibility', () => {
   it('exposes installable application metadata', () => {
     expect(markup.querySelector<HTMLLinkElement>('link[rel="manifest"]')?.getAttribute('href'))
       .toBe('./manifest.webmanifest');
-    expect(markup.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')?.getAttribute('href'))
-      .toBe('./icons/icon-192.png');
+    const touchIcon = markup.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+    expect(touchIcon?.getAttribute('href')).toBe('./icons/apple-touch-icon.png?v=face-1');
+    expect(touchIcon?.getAttribute('sizes')).toBe('180x180');
     expect(markup.querySelector<HTMLLinkElement>('link[rel="preload"][as="image"]')?.getAttribute('href'))
       .toBe('./icons/icon-192.png');
   });

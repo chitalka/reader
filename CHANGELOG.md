@@ -2,6 +2,25 @@
 
 All notable public changes to Chitalka are documented in this file.
 
+## [2.05] - 2026-09-08
+
+### Added
+
+- Added a live book-text preview, visual theme choices, and text alignment controls to reading settings.
+- Added collapsible sections, book title and author, and a current-chapter marker to the table of contents.
+- Added a compact mobile toolbar for contents, bookmarks, reading settings, and opening a book; tap the page to hide or show it.
+- Added a light-background tiger-face icon for saving Chitalka to the iPhone Home Screen.
+
+### Changed
+
+- Refined book typography, heading spacing, and page margins. New reading preferences start at 20 px with natural word spacing; existing saved font sizes are preserved.
+
+### Fixed
+
+- Kept the reading page stable and visible when mobile controls hide or return.
+- Adjusted bottom controls for the mobile Safari viewport and prevented long footer labels from overlapping.
+- Improved keyboard focus in settings and navigation through collapsed chapters in the table of contents.
+
 ## [2.04] - 2026-09-03
 
 ### Added
@@ -105,6 +124,7 @@ All notable public changes to Chitalka are documented in this file.
 - Included optional synchronization through private application folders in Google Drive and Yandex Disk.
 - Published the installable PWA demo at <https://chitalka.github.io/demo/>.
 
+[2.05]: https://github.com/chitalka/reader/releases/tag/v2.05
 [2.04]: https://github.com/chitalka/reader/releases/tag/v2.04
 [2.03.01]: https://github.com/chitalka/reader/releases/tag/v2.03.01
 [2.03]: https://github.com/chitalka/reader/releases/tag/v2.03
