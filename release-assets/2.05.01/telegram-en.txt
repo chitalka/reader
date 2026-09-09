@@ -1,0 +1,11 @@
+Chitalka 2.05.01 · Hotfix
+
+Fixed analytics on phones:
+• The page fits the screen; the yearly activity calendar scrolls within its own area.
+• Long book titles wrap, while session durations stay readable.
+• Removed the extra left offset from the reading forecast.
+
+Checked with a populated history of up to 730 sessions.
+
+Demo: https://chitalka.github.io/demo/
+Full notes: https://github.com/chitalka/reader/releases/tag/v2.05.01

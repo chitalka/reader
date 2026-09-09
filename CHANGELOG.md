@@ -2,6 +2,14 @@
 
 All notable public changes to Chitalka are documented in this file.
 
+## [2.05.01] - 2026-09-09
+
+### Fixed
+
+- Fixed the analytics page overflowing narrow screens: the activity calendar now scrolls within its own area without widening the dashboard.
+- Long book titles and filenames wrap in reading history, while session durations remain readable in a separate column.
+- Removed an unintended left offset from the reading forecast on mobile screens.
+
 ## [2.05] - 2026-09-08
 
 ### Added
@@ -124,6 +132,7 @@ All notable public changes to Chitalka are documented in this file.
 - Included optional synchronization through private application folders in Google Drive and Yandex Disk.
 - Published the installable PWA demo at <https://chitalka.github.io/demo/>.
 
+[2.05.01]: https://github.com/chitalka/reader/releases/tag/v2.05.01
 [2.05]: https://github.com/chitalka/reader/releases/tag/v2.05
 [2.04]: https://github.com/chitalka/reader/releases/tag/v2.04
 [2.03.01]: https://github.com/chitalka/reader/releases/tag/v2.03.01

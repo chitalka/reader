@@ -809,8 +809,10 @@ a:focus-visible {
   gap: 42px;
 }
 
-.analytics-insights section + section {
-  padding-left: 42px;
+@media (min-width: 721px) {
+  .analytics-insights section + section {
+    padding-left: 42px;
+  }
 }
 
 #settings-sync-view .sync-help {
