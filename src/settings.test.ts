@@ -17,6 +17,10 @@ describe('reader settings', () => {
     expect(DEFAULT_SETTINGS.pageButtons).toBe('auto');
   });
 
+  it('keeps mouse-wheel page turning off by default', () => {
+    expect(DEFAULT_SETTINGS.wheelNavigation).toBe(false);
+  });
+
   it('shows reading percentage in full-screen mode by default', () => {
     expect(DEFAULT_SETTINGS.fullscreenStatus).toBe('progress');
   });

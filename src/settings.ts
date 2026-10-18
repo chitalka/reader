@@ -17,6 +17,7 @@ export interface ReaderSettings {
   textAlignment: TextAlignment;
   pageMode: PageMode;
   pageButtons: PageButtonsMode;
+  wheelNavigation: boolean;
   fullscreenStatus: FullscreenStatusMode;
   footnoteMode: FootnoteMode;
   theme: Theme;
@@ -30,6 +31,7 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   textAlignment: 'start',
   pageMode: 'auto',
   pageButtons: 'auto',
+  wheelNavigation: false,
   fullscreenStatus: 'progress',
   footnoteMode: 'appendix',
   theme: 'auto',

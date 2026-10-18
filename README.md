@@ -34,6 +34,7 @@ The bundled edition of *Anna Karenina* opens automatically as the demo book. Use
 | `Home` / `End` | First / last page |
 | `+` / `-` | Increase / decrease font size |
 | Swipe left / right | Next / previous page |
+| Mouse wheel down / up | Next / previous page (off by default; enable **Turn pages with mouse wheel** in settings) |
 The floating header remains available after page turns. Page buttons can be shown, hidden, or left in **Auto** mode, which hides them on smaller touch-oriented layouts.
 
 ## Format support and safety

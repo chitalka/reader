@@ -12,6 +12,7 @@ import {
   bindTouchTap,
   swipeTurnDirection,
 } from './header-visibility';
+import { bindWheelNavigation } from './wheel-navigation';
 import { VisibilityMotion } from './motion';
 import {
   ReaderPager,
@@ -261,6 +262,7 @@ export class ChitalkaApp {
   private readonly alignmentInputs = requiredInputs('text-alignment');
   private readonly pageModeInputs = requiredInputs('page-mode');
   private readonly pageButtonInputs = requiredInputs('page-buttons');
+  private readonly wheelNavigationInputs = requiredInputs('wheel-navigation');
   private readonly fullscreenStatusInputs = requiredInputs('fullscreen-status');
   private readonly footnoteModeInputs = requiredInputs('footnote-mode');
   private readonly backButton = requiredElement<HTMLButtonElement>('back-to-text');
@@ -403,6 +405,7 @@ export class ChitalkaApp {
       textAlignment: normalizeTextAlignment(value.textAlignment),
       pageMode: pageModes.includes(value.pageMode) ? value.pageMode : DEFAULT_SETTINGS.pageMode,
       pageButtons: normalizePageButtonsMode(value.pageButtons),
+      wheelNavigation: value.wheelNavigation === true,
       fullscreenStatus: normalizeFullscreenStatusMode(value.fullscreenStatus),
       footnoteMode: footnoteModes.includes(value.footnoteMode)
         ? value.footnoteMode
@@ -452,6 +455,11 @@ export class ChitalkaApp {
     for (const input of this.pageButtonInputs) {
       input.addEventListener('change', () => {
         if (input.checked) this.setPageButtons(input.value as PageButtonsMode);
+      });
+    }
+    for (const input of this.wheelNavigationInputs) {
+      input.addEventListener('change', () => {
+        if (input.checked) this.setWheelNavigation(input.value === 'on');
       });
     }
     for (const input of this.fullscreenStatusInputs) {
@@ -510,6 +518,15 @@ export class ChitalkaApp {
     });
     document.addEventListener('selectionchange', () => this.scheduleSelectionMenu());
     document.addEventListener('keydown', (event) => this.handleKeydown(event));
+    bindWheelNavigation(this.reader, {
+      enabled: () => this.settings.wheelNavigation,
+      ignore: (target) => target instanceof Element
+        && (target.closest('input, textarea, select') !== null || this.quoteMenuElement.contains(target)),
+      turn: (direction) => {
+        if (direction > 0) this.navigate(() => this.pager.next());
+        else this.navigateBackward();
+      },
+    });
     bindMouseReadingClick(this.viewport, () => this.headerVisibility.toggle());
     bindTouchTap(this.viewport, () => this.headerVisibility.toggle());
     bindTouchSwipe(this.viewport, {
@@ -1082,6 +1099,13 @@ export class ChitalkaApp {
     this.updateSettingsControls();
   }
 
+  private setWheelNavigation(enabled: boolean): void {
+    if (enabled === this.settings.wheelNavigation) return;
+    this.settings.wheelNavigation = enabled;
+    this.saveSettings('wheelNavigation');
+    this.updateSettingsControls();
+  }
+
   private setFullscreenStatus(mode: FullscreenStatusMode): void {
     if (mode === this.settings.fullscreenStatus) return;
     this.settings.fullscreenStatus = mode;
@@ -1125,6 +1149,9 @@ export class ChitalkaApp {
     for (const input of this.pageModeInputs) input.checked = input.value === this.settings.pageMode;
     for (const input of this.pageButtonInputs) {
       input.checked = input.value === this.settings.pageButtons;
+    }
+    for (const input of this.wheelNavigationInputs) {
+      input.checked = (input.value === 'on') === this.settings.wheelNavigation;
     }
     for (const input of this.fullscreenStatusInputs) {
       input.checked = input.value === this.settings.fullscreenStatus;
